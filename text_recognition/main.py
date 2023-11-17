@@ -1,10 +1,15 @@
 from pathlib import Path
 
-from text_recognition.ocr_model import OCRModel
-from text_recognition.evaluation import evaluate_model
+from ocr_model import OCRModel
+from evaluation import evaluate_model
+import tensorflow as tf
+# this library provides multi language text embeddings
+import os 
 
+DATA_PATH = "dataset/"
 
 def main():
+
     model = OCRModel()
     data_path = Path(__file__).parent.parent / 'data' / 'public_data'
     accuracy = evaluate_model(model, data_path)
