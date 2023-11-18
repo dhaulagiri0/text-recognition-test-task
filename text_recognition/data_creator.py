@@ -107,6 +107,29 @@ def get_words_dict(entries, d, return_unknown=False):
     d["<UNK>"] = id + 3
     return unknowns
 
+# the dataset obtained does not contain curly braces or new lines, we I am manually inserting some of these characters
+def insert_char(sentences, characters="{}\n"):
+    rate = 0.05
+    for sentence in sentences:
+        en = sentence["sentence"]
+        chi = sentence["translated"] if "translated" in sentence else []
+        mix = sentence["mixed"] if "mixed" in sentence else []
+        if random.uniform(0, 1) <= rate:
+            for c in characters:
+                n = random.randint(1, len(en) - 1)
+                en1, en2 = en[0:n], en[n:]
+                en = sentence["sentence"] = f"{en1} {c} {en2}"
+
+                if chi != []:
+                    n = random.randint(1, len(chi) - 1)
+                    chi1, chi2 = chi[0:n], chi[n:]
+                    chi = sentence["translated"] = f"{chi1} {c} {chi2}"
+
+                    n = random.randint(1, len(mix) - 1)
+                    mix1, mix2 = mix[0:n], mix[n:]
+                    mix = sentence["mixed"] = f"{mix1} {c} {mix2}"
+
+
 def make_vocab(entries, path="dataset/vocab.json"):
     d = {}
     get_words_dict(entries, d)
