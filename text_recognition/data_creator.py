@@ -13,10 +13,10 @@ from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 from bpemb import BPEmb
-from embedding_utils import senetences_to_embed
 import translators as ts
 import json, io, os
 import random
+from tqdm import tqdm
 
 def make_image(text, fontsize=10, padding=10, image_background=(255, 255, 255), text_color=(0, 0, 0)):
 
@@ -47,30 +47,25 @@ def mix_trans(en, rate):
     mixed = []
     next = ""
     for wen in en.split(" "):
-        if random.uniform(0, 1) <= rate:
-            next = ts.translate_text(wen, to_language='chi')
-            if ("n." in next):
-                next = next.split(" ")[-1]
-        else:
-            next = wen
-        
+        next = ts.translate_text(wen, to_language='chi') if random.uniform(0, 1) <= rate else wen 
         mixed.append(next)
     return " ".join(mixed)
 
 def mix_translate(sentences, rate=0.3):
     # translator= Translator(to_lang="zh")
-    for d in sentences:
-        sentence        = d["sentence"]
-        full = ts.translate_text(sentence, to_language='chi')
-        # full = translator.translate(sentence)
-        d["mixed"]      = mix_trans(sentence, rate)
-        d["translated"] = full
+    for d in tqdm(sentences):
+        sentence = d["sentence"]
+        if "translated" not in d and len(sentence) < 1000:
+            full = ts.translate_text(sentence, to_language='chi')
+            # full = translator.translate(sentence)
+            d["mixed"]      = mix_trans(sentence, rate)
+            d["translated"] = full
 
 # dealing with the MAVEN dataset
-def load_maven(path="dataset"):
-    train_sentences = []
+def load_maven(path="dataset", dataset="train"):
+    sentences = []
     # multibpemb = BPEmb(lang="multi", vs=1000000, dim=300)
-    with open(os.path.join(path, "train.jsonl")) as train_file:
+    with open(os.path.join(path, f"{dataset}.jsonl")) as train_file:
         total = 0
         for i, line in enumerate(train_file):
             total = max(total, i)
@@ -78,26 +73,42 @@ def load_maven(path="dataset"):
             cur_json = json.loads(line)
             for sent_dict in cur_json["content"]:
                 sentence = sent_dict["sentence"]
-                train_sentences.append({"sentence": sentence})
+                sentences.append({"sentence": sentence})
                 # ids, embedding = get_embedding_pair(sentence, multibpemb)
                 # train_sentences.append({
                 #     "sentence": sentence,
                 #     "ids": ids,
                 #     "embedding": embedding 
                 # })
-            break
-    
-    return train_sentences
+        print(f"loaded {total} articles for {dataset}. Totalling {len(sentences)} sentences")
+    return sentences
 
-# img = make_image(u"Some English and Chinese 这是一个中文句子", 240)
-# img.save("dataset/123.png")
-# full = ts.translate_text("Some English and Chinese", to_language='chi')
-# print(full)
-load_maven()
-sentences = load_maven()
-mix_translate(sentences)
-embed_dict, words_dict = senetences_to_embed(sentences)
-print(words_dict)
-# translator = Translator(to_lang="zh")
-# t = translator.translate("The 2006 Pangandaran earthquake and tsunami occurred on July 17 at along a subduction zone off the coast of west and central Java, a large and densely populated island in the Indonesian archipelago.")
-# print(t)
+
+def get_words_dict(entries, d, return_unknown=False):
+    id = 0
+    unknowns = []
+    for i, entry in enumerate(entries):
+        en = entry["sentence"]
+        chi = entry["translated"] if "translated" in entry else []
+        for char in en:
+            if char not in d:
+                d[char] = id
+                id += 1
+                if return_unknown:
+                    unknowns.append(i)
+        for char in chi:
+            if char not in d:
+                d[char] = id
+                id += 1
+                if return_unknown:
+                    unknowns.append(i)
+    d["<START>"] = id + 1
+    d["<END>"] = id + 2
+    d["<UNK>"] = id + 3
+    return unknowns
+
+def make_vocab(entries, path="dataset/vocab.json"):
+    d = {}
+    get_words_dict(entries, d)
+    with open(path, 'w') as j:
+        json.dump(d, j)
