@@ -18,6 +18,11 @@ import json, io, os
 import random
 from tqdm import tqdm
 
+def load_json_data(path="dataset/raw/test_slid.json"):
+    f = open(path)
+    l = json.load(f)
+    return l   
+
 def make_image(text, fontsize=10, padding=10, image_background=(255, 255, 255), text_color=(0, 0, 0)):
 
     font = ImageFont.truetype("dataset/NotoSansSC-VariableFont_wght.ttf", fontsize)
@@ -40,6 +45,35 @@ def make_image(text, fontsize=10, padding=10, image_background=(255, 255, 255), 
     # img = Image.new('RGB', (200, 100), (255, 255, 255))
 
     return img2
+
+# eatch data entry contains path to image file, zs, label(tokens shifted by one position)
+def create_dataset(json_path, set="train", img_path="dataset/images/", fontsize=70, padding=10, image_background=(255, 255, 255), text_color=(0, 0, 0), createImage=True):
+    entries = load_json_data(f"{json_path}{set}.json")
+    imgs = {}
+    data = []
+    for i, entry in enumerate(entries):
+        original = entry["original"]
+        tokens = entry["tokens"]
+        id = i
+        if createImage and (original not in imgs):
+            imgs[original] = id
+            img = make_image(original, fontsize, padding, image_background, text_color)
+            img.save(f"{img_path}{set}/{str(i)}.png")
+        elif original in imgs:
+            id = imgs[original]
+        else:
+            imgs[original] = id
+
+        input = tokens[:-1]
+        output = tokens[1:]
+        data.append({
+            "img": f"{img_path}{set}/{str(id)}.png",
+            "input": input,
+            "label": output
+        })
+    return data
+        
+
 
 #randomly sample from two strings to create one string
 # rate determines the percentage of an English sentence being translated to Chinese
@@ -135,3 +169,84 @@ def make_vocab(entries, path="dataset/vocab.json"):
     get_words_dict(entries, d)
     with open(path, 'w') as j:
         json.dump(d, j)
+
+def load_json_entries(path="dataset/raw/", dataset="train"):
+    f = open(path + dataset)
+    l = json.load(f)
+    return l     
+
+def check_piece(pieces, d):
+    ps = []
+    for piece in pieces:
+        if piece not in d:
+            for i in piece: ps.append(i) if i in d else ps.append("<unk>")
+        else:
+            ps.append(piece)
+    return ps
+
+# takes in a list of setence pieces, corresponding token
+# return two lists
+def slide_sentence(pieces, tokens, limit=64, window = 5):
+    if len(pieces) <= limit:
+        return [pieces], [tokens]
+    
+    new_t = []
+    new_p = []
+    steps, remainder = divmod((len(pieces) - limit), window)
+    for i in range(1, steps + 1):
+        start = i*5
+        end = i*5 + limit
+
+        sub_p = pieces[start:end]
+        sub_t = tokens[start:end]
+
+        new_t.append(sub_t)
+        new_p.append(sub_p)
+    if remainder != 0:
+        new_p.append(pieces[(len(pieces) - limit):])
+        new_t.append(tokens[(len(pieces) - limit):])
+
+    return new_p, new_t
+
+
+
+# process all sentences, add BOS and EOS, split sequences longer than 512
+def process_raw_entries(entries, sp, d):
+    processed = []
+    for entry in entries:
+        en = entry["sentence"]
+        chi = []
+        mix = []
+        if "translated" in entry:
+            chi = entry["translated"]
+            mix = entry["mixed"]
+        for sentence in [en, chi, mix]:
+            if sentence != []:
+                #a adds BOS and EOS
+                pieces = ["<s>"] + sp.EncodeAsPieces(sentence) + ["</s>"]
+                piecess = check_piece(pieces, d)
+                processed.append({
+                    "original" : sentence,
+                    "sequence" : piecess,
+                    "tokens": [d[i] for i in piecess]
+                })
+    return processed
+
+def process_limited_entries(entries, limit=64, window=5):
+    new = []
+    for entry in entries:
+        if len(entry["sequence"]) > limit:
+            ps, ts = slide_sentence(entry["sequence"], entry["tokens"], limit, window)
+            for p, t in zip(ps, ts):
+                new.append({
+                    "original": entry["original"],
+                    "sequence": p,
+                    "tokens": t
+                })
+        else:
+            new.append({
+                "original": entry["original"],
+                "sequence": entry["sequence"],
+                "tokens": entry["tokens"]
+            })
+    return new

@@ -2,6 +2,7 @@
 from bpemb import BPEmb
 import numpy as np
 import os
+import json
 
 DATA_PATH = "dataset/"
 TXT_REL = "mul.txt"
@@ -10,28 +11,23 @@ dirname = os.path.dirname(DATA_PATH)
 
 # print(embeddings_index)
 
-# def create_embed_index(path):
-#     span = 10
-#     start = 1000
+def create_embed_index(path):
 
-#     embeddings_index = {}
-#     with open(path) as f:
-#         for i, line in enumerate(f):
-#             # ignore first line
-#             if i < start:
-#                 continue
-#             if i != 0:
-#                 word, coefs = line.split(maxsplit=1)
-#                 coefs = np.fromstring(coefs, "f", sep=" ")
-#                 embeddings_index[word] = coefs
-#                 print(word)
-#             if i == start + span:
-#                 break
+    embeddings_index = {}
+    with open(path) as f:
+        for i, line in enumerate(f):
+            # ignore first line
+            if i < 1:
+                continue
+            if i != 0:
+                word, coefs = line.split(maxsplit=1)
+                coefs = np.fromstring(coefs, "f", sep=" ")
+                embeddings_index[word] = coefs
     
-#     dim = len(embeddings_index[next(iter(embeddings_index))])
+    dim = len(embeddings_index[next(iter(embeddings_index))])
 
-#     print(f'Found {len(embeddings_index)} word vectors. Of length {dim}')
-#     return embeddings_index, dim
+    print(f'Found {len(embeddings_index)} word vectors. Of length {dim}')
+    return embeddings_index, dim
 
 # # the word_index in this case should be a dictionary of of BPEmb.encode subwords
 # def create_maxtric(word_index, embeddings_index, embedding_dim = 300):
@@ -99,6 +95,44 @@ def senetences_to_embed(sentences):
         add_to(word_dict, chi_ids, encoded_chi)
         
     return embed_dict, word_dict
+
+def load_json_data(path="dataset/train_trans.json"):
+    f = open(path)
+    l = json.load(f)
+    return l      
+
+def make_embedding(output_path = "dataset/embedding",
+                   BPEmbPath = "dataset/", 
+                   bpemb_name="multi.wiki.bpe.vs409024.d300.w2v.txt", 
+                   dict_path = "dataset/vocab_bpemb.json", ):
+    
+    np.set_printoptions(suppress=True)
+    embedding_index , _ = create_embed_index(f"{BPEmbPath}/{bpemb_name}")
+    d = load_json_data(dict_path)
+    embedding_matrix = {}
+
+    for word, embedding in embedding_index.items():
+        embedding_matrix[d[word]] = embedding
+
+    with open(output_path, "w") as f:
+        for key, value in embedding_matrix.items():
+            coeff = np.array2string(value).replace('\n', '')[1:-1]
+            f.writelines(f"{key} {coeff}\n")
+
+    
+def load_embedding(path):
+
+    embedding = {}
+    with open(path) as f:
+        for i, line in enumerate(f):
+            id, coefs = line.split(maxsplit=1)
+            coefs = np.fromstring(coefs, "f", sep=" ")
+            embedding[int(id)] = coefs
+    
+    dim = len(embedding[0])
+    print(f'Found {len(embedding)} word vectors. Of length {dim}')
+    return embedding, dim
+
 
 # embeddings_index, dim = create_embed_index(os.path.join(dirname, TXT_REL))
 
