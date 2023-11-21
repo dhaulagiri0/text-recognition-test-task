@@ -48,7 +48,7 @@ def getImageGrey(img, height=224, width=224):
     img_tensor = tf.image.resize_with_pad(tensor, target_height=height, target_width=width)
     return img_tensor[tf.newaxis, :]
 
-# the average height and width of the images is around 4000x150
+# the average height and width of the images is around 4000x200
 def write_record_patches(entries, filename, patch_shape=(5, 5)):
   
     with tf.io.TFRecordWriter(filename) as writer:
@@ -74,7 +74,7 @@ def write_record_patches(entries, filename, patch_shape=(5, 5)):
             example = serialize_example(values, keys, fs)
             writer.write(example)
 
-def write_record(entries, filename, limit=64):
+def write_record(entries, filename):
   
     with tf.io.TFRecordWriter(filename) as writer:
         for entry in entries:
@@ -82,7 +82,7 @@ def write_record(entries, filename, limit=64):
             input = entry["input"]
             label = entry["label"]
             try:
-                timg = getImage(img)
+                timg = getImage(img, height=20, width=400)
             except:
                 print(entry)
                 continue

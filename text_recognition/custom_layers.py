@@ -1,10 +1,12 @@
 import tensorflow as tf
 from text_recognition import embedding_utils as eu
+
 import numpy as np
 import tqdm, collections
 
+
 class SeqEmbedding(tf.keras.layers.Layer):
-    def __init__(self, vocab_size=409094, max_length=64, depth=300, embedding_weights="dataset/embedding.txt"):
+    def __init__(self, vocab_size=409094, max_length=64, depth=256, embedding_weights="dataset/embedding.txt"):
         super().__init__()
         self.pos_embedding = tf.keras.layers.Embedding(input_dim=max_length, output_dim=depth)
 
@@ -19,6 +21,25 @@ class SeqEmbedding(tf.keras.layers.Layer):
 
     def call(self, seq):
         seq = self.token_embedding(seq) # (batch, seq, depth)
+
+        x = tf.range(tf.shape(seq)[1])  # (seq)
+        x = x[tf.newaxis, :]  # (1, seq)
+        x = self.pos_embedding(x)  # (1, seq, depth)
+
+        return self.add([seq,x])
+    
+class ImageEmbedding(tf.keras.layers.Layer):
+    def __init__(self, patches_length=80, units=256):
+        super().__init__()
+        self.pos_embedding = tf.keras.layers.Embedding(input_dim=patches_length, output_dim=units)
+
+        #Nx80x100 -> Nx80x256
+        self.image_embedding = tf.keras.layers.Dense(units=256, activation="relu")
+
+        self.add = tf.keras.layers.Add()
+
+    def call(self, seq):
+        seq = self.image_embedding(seq) # (batch, seq, depth)
 
         x = tf.range(tf.shape(seq)[1])  # (seq)
         x = x[tf.newaxis, :]  # (1, seq)
@@ -102,7 +123,28 @@ class DecoderLayer(tf.keras.layers.Layer):
         out_seq = self.ff(out_seq)
 
         return out_seq
-  
+
+class EncoderLayer(tf.keras.layers.Layer):
+    def __init__(self, units, num_heads=1, dropout_rate=0.1):
+        super().__init__()
+
+        self.self_attention = CausalSelfAttention(num_heads=num_heads,
+                                                key_dim=units,
+                                                dropout=dropout_rate)
+        
+        self.ff = FeedForward(units=units, dropout_rate=dropout_rate)
+
+
+    def call(self, inputs, training=False):
+        # in_seq is the image, out_seq is the tokens
+        in_seq = inputs
+
+        out_seq = self.self_attention(out_seq)
+
+        out_seq = self.ff(out_seq)
+
+        return out_seq
+
 class TokenOutput(tf.keras.layers.Layer):
     def __init__(self, vocab_size, banned_tokens=('', '<UNK>', '<s>'), **kwargs):
         super().__init__()
