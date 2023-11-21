@@ -16,7 +16,7 @@ def _bytes_feature(value):
         value = value.numpy() # BytesList won't unpack a string from an EagerTensor.
     return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
-def serialize_example(values, keys, fs, limit=64):
+def serialize_example(values, keys, fs, d, limit=64):
     """
     Creates a tf.train.Example message ready to be written to a file.
     """
@@ -26,7 +26,7 @@ def serialize_example(values, keys, fs, limit=64):
     for value, key, f in zip(values, keys, fs):
         if key != "img":
             paddings = tf.constant([[0, limit - len(value)]])
-            value = tf.pad(value, paddings)
+            value = tf.pad(value, paddings, constant_values=d["<unk>"])
             tensor = f(value)
             feature[key] = tensor
         else:
@@ -74,7 +74,7 @@ def write_record_patches(entries, filename, patch_shape=(5, 5)):
             example = serialize_example(values, keys, fs)
             writer.write(example)
 
-def write_record(entries, filename):
+def write_record(entries, filename, d):
   
     with tf.io.TFRecordWriter(filename) as writer:
         for entry in entries:
@@ -89,5 +89,5 @@ def write_record(entries, filename):
             values = [input, label, timg]
             fs = [_int64_feature, _int64_feature, _bytes_feature]
             keys = ["input", "label", "img"]
-            example = serialize_example(values, keys, fs)
+            example = serialize_example(values, keys, fs, d)
             writer.write(example)

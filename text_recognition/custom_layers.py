@@ -1,25 +1,25 @@
 import tensorflow as tf
-from text_recognition import embedding_utils as eu
+import embedding_utils as eu
 
 import numpy as np
 import tqdm, collections
 
 
 class SeqEmbedding(tf.keras.layers.Layer):
-    def __init__(self, vocab_size=409094, max_length=64, depth=256, embedding_weights="dataset/embedding.txt"):
+    def __init__(self, embedding_weights, vocab_size=409094, max_length=64, depth=256):
         super().__init__()
         self.pos_embedding = tf.keras.layers.Embedding(input_dim=max_length, output_dim=depth)
 
-        embedding, dim = eu.load_embedding(embedding_weights)
         self.token_embedding = tf.keras.layers.Embedding(
             input_dim=vocab_size,
-            output_dim=dim,
-            weight=[embedding],
+            output_dim=depth, #TODO move this into parameters
             mask_zero=True)
+            # embeddings_initializer=tf.keras.initializers.Constant(embedding_weights),
 
         self.add = tf.keras.layers.Add()
 
     def call(self, seq):
+
         seq = self.token_embedding(seq) # (batch, seq, depth)
 
         x = tf.range(tf.shape(seq)[1])  # (seq)
@@ -31,10 +31,12 @@ class SeqEmbedding(tf.keras.layers.Layer):
 class ImageEmbedding(tf.keras.layers.Layer):
     def __init__(self, patches_length=80, units=256):
         super().__init__()
+        self.patches_length = patches_length
+        self.units = units
         self.pos_embedding = tf.keras.layers.Embedding(input_dim=patches_length, output_dim=units)
 
         #Nx80x100 -> Nx80x256
-        self.image_embedding = tf.keras.layers.Dense(units=256, activation="relu")
+        self.image_embedding = tf.keras.layers.Dense(units=units, activation="relu")
 
         self.add = tf.keras.layers.Add()
 
@@ -44,8 +46,8 @@ class ImageEmbedding(tf.keras.layers.Layer):
         x = tf.range(tf.shape(seq)[1])  # (seq)
         x = x[tf.newaxis, :]  # (1, seq)
         x = self.pos_embedding(x)  # (1, seq, depth)
-
-        return self.add([seq,x])
+        # x = tf.broadcast_to(x, [seq.shape[0], self.patches_length, self.units])
+        return self.add([seq, x])
   
 class CausalSelfAttention(tf.keras.layers.Layer):
     def __init__(self, **kwargs):
@@ -139,14 +141,14 @@ class EncoderLayer(tf.keras.layers.Layer):
         # in_seq is the image, out_seq is the tokens
         in_seq = inputs
 
-        out_seq = self.self_attention(out_seq)
+        out_seq = self.self_attention(in_seq)
 
         out_seq = self.ff(out_seq)
 
         return out_seq
 
 class TokenOutput(tf.keras.layers.Layer):
-    def __init__(self, vocab_size, vocab_dict, banned_tokens=('', '<UNK>', '<s>'), **kwargs):
+    def __init__(self, vocab_size, vocab_dict, banned_tokens=('<unk>', '<s>'), **kwargs):
         super().__init__()
 
         self.dense = tf.keras.layers.Dense(

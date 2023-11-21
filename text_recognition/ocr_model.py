@@ -1,35 +1,36 @@
 from pathlib import Path
 import tensorflow as tf
-from text_recognition.custom_layers import DecoderLayer, SeqEmbedding, ImageEmbedding, EncoderLayer
-from text_recognition.embedding_utils import load_json_data
-from text_recognition.dataset import detokenise
-from text_recognition.tf_data_process import getImageGrey
+from custom_layers import DecoderLayer, SeqEmbedding, ImageEmbedding, EncoderLayer
+from embedding_utils import load_json_data
+from dataset import detokenise
+from tf_data_process import getImage
 from PIL import Image
 
 
-class OCRModel(tf.keras.model):
+class OCRModel(tf.keras.Model):
     
     def __init__(self, output_layer,
                  dictionary, 
+                 embedding_weights,
                  image_shape=[20, 400], # HxW
                  patch_shape=[10, 10],
                  vocab_size=409094, 
-                 num_heads=4,
+                 num_heads=6,
                  num_layers=2, 
                  units=256,
                  patches_length=80, 
                  max_length=64, 
-                 dropout_rate=0.1, 
-                 embedding_weigths="dataset/embedding.txt",
+                 dropout_rate=0.1
                  ):
         
         super().__init__()
 
+        self.seq_embedding_weights = embedding_weights
         self.max_length = max_length
         self.image_shape = image_shape
         self.patch_shape = patch_shape
 
-        self.seq_embedding = SeqEmbedding(vocab_size, max_length, units, embedding_weigths)
+        self.seq_embedding = SeqEmbedding(embedding_weights, vocab_size, max_length, units)
 
         self.image_embedding = ImageEmbedding(patches_length, units)
 
@@ -47,14 +48,13 @@ class OCRModel(tf.keras.model):
 
     def word_to_token(self, pieces):
         tokens = []
-        for piece in pieces[0]:
+        for piece in pieces:
             if piece in self.word_index:
                 tokens.append(self.word_index[piece])
             else:
                 tokens.append(self.word_index["<unk>"])
 
-        tokens.append(self.word_index["</s>"])
-        return [tokens]
+        return tokens
 
     def recognize_text(self, image: Path, temperature=1) -> str:
         """
@@ -63,30 +63,35 @@ class OCRModel(tf.keras.model):
         :param image: The path to the image file.
         :return: The recognized text from the image.
         """
-        img = Image.open(image)
-        initial = self.word_to_index([['[START]']]) # (batch, sequence)
+        img = Image.open(image).convert('RGB')
+        initial = self.word_to_token(['<s>']) # (batch, sequence)
+        timg = tf.keras.utils.img_to_array(img)
 
-        timg = getImageGrey(img, self.image_shape[0], self.image_shape[1])
+        #TODO move all this stuff into a preprocessing function
+        timg = tf.image.resize_with_pad(timg, target_height=self.image_shape[0], target_width=self.image_shape[1])
+        timg = tf.image.rgb_to_grayscale(timg)[tf.newaxis, :]
         patches = tf.image.extract_patches(timg, 
                                     sizes=[1, self.patch_shape[0], self.patch_shape[1], 1], 
                                     strides=[1, self.patch_shape[0], self.patch_shape[1], 1], 
                                     rates=[1, 1, 1, 1], 
                                     padding="VALID")
 
+        patches = tf.reshape(patches, (patches.shape[0], patches.shape[1] * patches.shape[2], patches.shape[-1]))
         tokens = initial # (batch, sequence)
         for n in range(self.max_length):
-            preds = self((patches, tokens)).numpy()  # (batch, sequence, vocab)
+            paddings = tf.constant([[0, self.max_length - len(tokens)]])
+            preds = self((patches, tf.cast(tf.pad(tokens, paddings)[tf.newaxis, :], dtype=tf.int64))).numpy()  # (batch, sequence, vocab)
             preds = preds[:,-1, :]  #(batch, vocab)
             if temperature==0:
-                next = tf.argmax(preds, axis=-1)[:, tf.newaxis]  # (batch, 1)
+                next = tf.squeeze(tf.argmax(preds, axis=-1))
             else:
-                next = tf.random.categorical(preds/temperature, num_samples=1)  # (batch, 1)
-            tokens = tf.concat([tokens, next], axis=1) # (batch, sequence) 
+                next = tf.squeeze(tf.random.categorical(preds/temperature, num_samples=1))
+            tokens = tokens + [next.numpy().tolist()]# (batch, sequence) 
 
-            if next[0] == self.word_to_index('</s>'):
+            if next == self.word_index['</s>']:
                 break
 
-        return detokenise(tokens[0, :], self.index_word)
+        return detokenise(tokens, self.index_word)
 
 
     def call(self, inputs):
@@ -105,7 +110,7 @@ class OCRModel(tf.keras.model):
         for dec_layer in self.decoder_layers:
             txt_seq = dec_layer(inputs=(image_seq, txt_seq))
 
-            txt_seq = self.output_layer(txt_seq)
+        txt_seq = self.output_layer(txt_seq)
 
         return txt_seq
 

@@ -101,9 +101,9 @@ def load_json_data(path="dataset/train_trans.json"):
     l = json.load(f)
     return l      
 
-def make_embedding(output_path = "dataset/embedding",
+def make_embedding(output_path = "dataset/embedding.txt",
                    BPEmbPath = "dataset/", 
-                   bpemb_name="multi.wiki.bpe.vs409024.d300.w2v.txt", 
+                   bpemb_name="multi.wiki.bpe.vs409094.d300.w2v.txt", 
                    dict_path = "dataset/vocab_bpemb.json", ):
     
     np.set_printoptions(suppress=True)
