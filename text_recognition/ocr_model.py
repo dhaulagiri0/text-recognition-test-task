@@ -9,10 +9,11 @@ from PIL import Image
 
 class OCRModel(tf.keras.model):
     
-    def __init__(self, output_layer, 
+    def __init__(self, output_layer,
+                 dictionary, 
                  image_shape=[20, 400], # HxW
                  patch_shape=[10, 10],
-                 vocab_seize=409094, 
+                 vocab_size=409094, 
                  num_heads=4,
                  num_layers=2, 
                  units=256,
@@ -20,7 +21,7 @@ class OCRModel(tf.keras.model):
                  max_length=64, 
                  dropout_rate=0.1, 
                  embedding_weigths="dataset/embedding.txt",
-                 dictionary=""):
+                 ):
         
         super().__init__()
 
@@ -28,7 +29,7 @@ class OCRModel(tf.keras.model):
         self.image_shape = image_shape
         self.patch_shape = patch_shape
 
-        self.seq_embedding = SeqEmbedding(vocab_seize, max_length, units, embedding_weigths)
+        self.seq_embedding = SeqEmbedding(vocab_size, max_length, units, embedding_weigths)
 
         self.image_embedding = ImageEmbedding(patches_length, units)
 
@@ -40,7 +41,8 @@ class OCRModel(tf.keras.model):
             EncoderLayer(units, num_heads, dropout_rate) 
             for n in range(num_layers)]
         
-        self.word_index = load_json_data("dataset/vocab_bpemb.json")
+        self.output_layer = output_layer
+        self.word_index = dictionary
         self.index_word = {v:k for k, v in self.word_index.items()}
 
     def word_to_token(self, pieces):

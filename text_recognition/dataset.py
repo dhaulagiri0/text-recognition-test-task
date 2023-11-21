@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 feature_description = {
-    'img': tf.io.FixedLenFeature([], tf.string),
+    'img': tf.io.FixedLenFeature([1, 2, 40, 300], tf.string),
     'input': tf.io.FixedLenFeature([64], tf.int64),
     'label': tf.io.FixedLenFeature([64], tf.int64)
 }
@@ -30,7 +30,7 @@ def getFeatureExtractor():
     return mobilenet
 
 
-def prepare_dataset(ds, featureExtractor, batch_size=32, shuffle_buffer=1000, patch_shape=(10, 10)):
+def prepare_dataset(ds, batch_size=32, shuffle_buffer=1000, patch_shape=(10, 10)):
 
     trainAug = tf.keras.Sequential(
         [

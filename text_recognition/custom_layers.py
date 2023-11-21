@@ -146,7 +146,7 @@ class EncoderLayer(tf.keras.layers.Layer):
         return out_seq
 
 class TokenOutput(tf.keras.layers.Layer):
-    def __init__(self, vocab_size, banned_tokens=('', '<UNK>', '<s>'), **kwargs):
+    def __init__(self, vocab_size, vocab_dict, banned_tokens=('', '<UNK>', '<s>'), **kwargs):
         super().__init__()
 
         self.dense = tf.keras.layers.Dense(
@@ -154,10 +154,11 @@ class TokenOutput(tf.keras.layers.Layer):
         self.banned_tokens = banned_tokens
         self.vocab_size = vocab_size
         self.bias = None
+        self.vocab_dict = vocab_dict
 
     def adapt(self, ds):
         counts = collections.Counter()
-        vocab_dict = eu.load_json_data("dataset/vocab_bpemb.json")
+        vocab_dict = self.vocab_dict
 
         for tokens in tqdm.tqdm(ds):
             counts.update(tokens.numpy().flatten())
@@ -185,8 +186,5 @@ class TokenOutput(tf.keras.layers.Layer):
 
     def call(self, x):
         x = self.dense(x)
-        # TODO(b/250038731): Fix this.
-        # An Add layer doesn't work because of the different shapes.
-        # This clears the mask, that's okay because it prevents keras from rescaling
-        # the losses.
+
         return x + self.bias
