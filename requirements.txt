@@ -1,2 +1,4 @@
 python-Levenshtein
 numpy
+bpemb
+einops
