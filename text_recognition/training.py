@@ -55,7 +55,7 @@ def train_model(train_ds_path, valid_ds_path, vocab_size=409094, dictionary_path
 
 
     log_dir = "dataset/logs/fits" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
+    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=0, write_graph=False)
 
     callbacks = [
         tensorboard_callback,
@@ -84,7 +84,7 @@ def train_model(train_ds_path, valid_ds_path, vocab_size=409094, dictionary_path
 
     history = model.fit(
         train_ds.repeat(),
-        steps_per_epoch=1000,
+        steps_per_epoch=10,
         validation_data=valid_ds.repeat(),
         validation_steps=20,
         epochs=100,

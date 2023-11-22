@@ -55,6 +55,7 @@ def prepare_dataset(ds, batch_size=32, shuffle_buffer=1000, patch_shape=(10, 10)
     def getpatches(inputs, label):
         img, input = inputs
         tensor = tf.image.rgb_to_grayscale(img)
+        tensor = tf.cast(tensor, tf.float32) * tf.constant(1/255.) 
         tensor = tensor[tf.newaxis, :]
         patches = tf.image.extract_patches(tensor, 
                                     sizes=[1, patch_shape[0], patch_shape[1], 1], 
