@@ -90,7 +90,8 @@ class OCRModel(tf.keras.Model):
 
             if next == self.word_index['</s>']:
                 break
-
+        
+        print(tokens)
         return detokenise(tokens, self.index_word)
 
 
