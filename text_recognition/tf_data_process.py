@@ -82,7 +82,7 @@ def write_record(entries, filename, d):
             input = entry["input"]
             label = entry["label"]
             try:
-                timg = getImage(img, height=20, width=400)
+                timg = getImage(img, height=100, width=2000)
             except:
                 print(entry)
                 continue

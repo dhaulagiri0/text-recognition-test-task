@@ -36,8 +36,7 @@ def prepare_dataset(ds, batch_size=32, shuffle_buffer=1000, patch_shape=(10, 10)
     trainAug = tf.keras.Sequential(
         [
             tf.keras.layers.RandomBrightness(factor=[-0.5, 0.5]),
-            tf.keras.layers.RandomContrast(factor=0.5),
-            tf.keras.layers.RandomRotation(factor=[-0.1, 0.1]),
+            tf.keras.layers.RandomContrast(factor=0.5)
         ]
     )
     
@@ -62,7 +61,7 @@ def prepare_dataset(ds, batch_size=32, shuffle_buffer=1000, patch_shape=(10, 10)
                                     strides=[1, patch_shape[0], patch_shape[1], 1], 
                                     rates=[1, 1, 1, 1], 
                                     padding="VALID")
-        patches = tf.ensure_shape(patches, (1, 2, 40, 100))
+        patches = tf.ensure_shape(patches, (1, 10, 200, 100))
         patches = tf.reshape(patches, (patches.shape[0], patches.shape[1] * patches.shape[2], patches.shape[-1]))
         patches = tf.squeeze(patches)
         return (patches, input), label
