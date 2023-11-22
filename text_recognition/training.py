@@ -84,9 +84,9 @@ def train_model(train_ds_path, valid_ds_path, vocab_size=409094, dictionary_path
 
     history = model.fit(
         train_ds.repeat(),
-        steps_per_epoch=10,
+        steps_per_epoch=1000,
         validation_data=valid_ds.repeat(),
-        validation_steps=20,
+        validation_steps=200,
         epochs=100,
         callbacks=callbacks)
     
