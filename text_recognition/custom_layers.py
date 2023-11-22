@@ -4,36 +4,75 @@ import embedding_utils as eu
 import numpy as np
 import tqdm, collections
 
+def positional_encoding(length, depth):
+  depth = depth/2
+
+  positions = np.arange(length)[:, np.newaxis]     # (seq, 1)
+  depths = np.arange(depth)[np.newaxis, :]/depth   # (1, depth)
+
+  angle_rates = 1 / (10000**depths)         # (1, depth)
+  angle_rads = positions * angle_rates      # (pos, depth)
+
+  pos_encoding = np.concatenate(
+      [np.sin(angle_rads), np.cos(angle_rads)],
+      axis=-1) 
+
+  return tf.cast(pos_encoding, dtype=tf.float32)
+
+# class PositionalEmbedding(tf.keras.layers.Layer):
+#   def __init__(self, vocab_size, d_model):
+#     super().__init__()
+#     self.d_model = d_model
+#     self.embedding = tf.keras.layers.Embedding(vocab_size, d_model, mask_zero=True) 
+#     self.pos_encoding = positional_encoding(length=2048, depth=d_model)
+
+#   def compute_mask(self, *args, **kwargs):
+#     return self.embedding.compute_mask(*args, **kwargs)
+
+#   def call(self, x):
+#     length = tf.shape(x)[1]
+#     x = self.embedding(x)
+#     # This factor sets the relative scale of the embedding and positonal_encoding.
+#     x *= tf.math.sqrt(tf.cast(self.d_model, tf.float32))
+#     x = x + self.pos_encoding[tf.newaxis, :length, :]
+#     return x
 
 class SeqEmbedding(tf.keras.layers.Layer):
     def __init__(self, embedding_weights, vocab_size=409094, max_length=64, depth=256):
         super().__init__()
-        self.pos_embedding = tf.keras.layers.Embedding(input_dim=max_length, output_dim=depth)
+        self.pos_encoding = positional_encoding(length=2048, depth=depth)
 
         self.token_embedding = tf.keras.layers.Embedding(
             input_dim=vocab_size,
             output_dim=depth, #TODO move this into parameters
             mask_zero=True)
             # embeddings_initializer=tf.keras.initializers.Constant(embedding_weights),
-
+        self.depth = depth
         self.add = tf.keras.layers.Add()
 
+    def compute_mask(self, *args, **kwargs):
+        return self.token_embedding.compute_mask(*args, **kwargs)
+
     def call(self, seq):
+        length = tf.shape(seq)[1]
+        x = self.token_embedding(seq) # (batch, seq, depth)
 
-        seq = self.token_embedding(seq) # (batch, seq, depth)
+        # x = tf.range(tf.shape(seq)[1])  # (seq)
+        # x = x[tf.newaxis, :]  # (1, seq)
+        # x = self.pos_embedding(x)  # (1, seq, depth)
 
-        x = tf.range(tf.shape(seq)[1])  # (seq)
-        x = x[tf.newaxis, :]  # (1, seq)
-        x = self.pos_embedding(x)  # (1, seq, depth)
+        x *= tf.math.sqrt(tf.cast(self.depth, tf.float32))
+        x = x + self.pos_encoding[tf.newaxis, :length, :]
 
-        return self.add([seq,x])
+        # return self.add([seq,x])
+        return x
     
 class ImageEmbedding(tf.keras.layers.Layer):
     def __init__(self, patches_length=80, units=256):
         super().__init__()
         self.patches_length = patches_length
         self.units = units
-        self.pos_embedding = tf.keras.layers.Embedding(input_dim=patches_length, output_dim=units)
+        self.pos_encoding = positional_encoding(length=2048, depth=units)
 
         #Nx80x100 -> Nx80x256
         self.image_embedding = tf.keras.layers.Dense(units=units, activation="relu")
@@ -41,13 +80,17 @@ class ImageEmbedding(tf.keras.layers.Layer):
         self.add = tf.keras.layers.Add()
 
     def call(self, seq):
-        seq = self.image_embedding(seq) # (batch, seq, depth)
+        length = tf.shape(seq)[1]
+        x = self.image_embedding(seq) # (batch, seq, depth)
 
-        x = tf.range(tf.shape(seq)[1])  # (seq)
-        x = x[tf.newaxis, :]  # (1, seq)
-        x = self.pos_embedding(x)  # (1, seq, depth)
+        # x = tf.range(tf.shape(seq)[1])  # (seq)
+        # x = x[tf.newaxis, :]  # (1, seq)
+        # x = self.pos_embedding(x)  # (1, seq, depth)
         # x = tf.broadcast_to(x, [seq.shape[0], self.patches_length, self.units])
-        return self.add([seq, x])
+        x *= tf.math.sqrt(tf.cast(self.units, tf.float32))
+        x = x + self.pos_encoding[tf.newaxis, :length, :]
+        # return self.add([seq, x])
+        return x
   
 class CausalSelfAttention(tf.keras.layers.Layer):
     def __init__(self, **kwargs):
