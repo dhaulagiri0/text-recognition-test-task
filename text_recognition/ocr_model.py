@@ -14,9 +14,9 @@ class OCRModel(tf.keras.Model):
                  patch_shape=[10, 10],
                  vocab_size=409094, 
                  num_heads=4,
-                 num_layers=4, 
-                 units=512,
-                 patches_length=80, 
+                 num_layers=2, 
+                 units=256,
+                 patches_length=2000, 
                  max_length=64, 
                  dropout_rate=0.1
                  ):
@@ -75,7 +75,7 @@ class OCRModel(tf.keras.Model):
 
         patches = tf.reshape(patches, (patches.shape[0], patches.shape[1] * patches.shape[2], patches.shape[-1]))
         tokens = initial # (batch, sequence)
-        for n in range(self.max_length):
+        for n in range(self.max_length // 2):
             paddings = tf.constant([[0, self.max_length - len(tokens)]])
             preds = self((patches, tf.cast(tf.pad(tokens, paddings)[tf.newaxis, :], dtype=tf.int64))).numpy()  # (batch, sequence, vocab)
             preds = preds[:,-1, :]  #(batch, vocab)

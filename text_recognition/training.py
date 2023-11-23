@@ -42,13 +42,13 @@ def train_model(train_ds_path, valid_ds_path, vocab_size=409094, dictionary_path
     train_ds = tf.data.TFRecordDataset(train_ds_path).map(_parse_function)
     valid_ds = tf.data.TFRecordDataset(valid_ds_path).map(_parse_function)
 
-    train_ds = prepare_dataset(train_ds, batch_size=32)
-    valid_ds = prepare_dataset(valid_ds, batch_size=32)
+    train_ds = prepare_dataset(train_ds, batch_size=8)
+    valid_ds = prepare_dataset(valid_ds, batch_size=8)
 
     checkpoint_filepath = 'dataset/checkpoints/'
     model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=checkpoint_filepath,
-        save_weights_only=False,
+        save_weights_only=True,
         monitor='val_masked_acc',
         mode='max',
         save_best_only=True)
@@ -68,10 +68,7 @@ def train_model(train_ds_path, valid_ds_path, vocab_size=409094, dictionary_path
     output_layer = TokenOutput(vocab_size, vocab_dict)
     output_layer.adapt(train_ds.map(lambda inputs, labels: labels))
     
-    # embedding, dim = load_embedding("dataset/embedding.txt")
-    
     # embedding_weights, dim = load_embedding_json("dataset/embedding.json")
-    # embedding_weights = tf.Variable(embedding_weights, trainable=True)
     # print("loaded embedding weigths")
 
     model = OCRModel(output_layer, dictionary=vocab_dict, embedding_weights=None, image_shape=[100, 2000])

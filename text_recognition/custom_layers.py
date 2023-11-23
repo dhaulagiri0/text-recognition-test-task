@@ -44,8 +44,11 @@ class SeqEmbedding(tf.keras.layers.Layer):
         self.token_embedding = tf.keras.layers.Embedding(
             input_dim=vocab_size,
             output_dim=depth, #TODO move this into parameters
-            mask_zero=True)
-            # embeddings_initializer=tf.keras.initializers.Constant(embedding_weights),
+            mask_zero=True,
+            trainable=True)
+        
+        #embeddings_initializer=tf.keras.initializers.Constant(embedding_weights),
+        
         self.depth = depth
         self.add = tf.keras.layers.Add()
 
