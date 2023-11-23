@@ -2,6 +2,7 @@ from pathlib import Path
 import tensorflow as tf
 from custom_layers import DecoderLayer, SeqEmbedding, ImageEmbedding, EncoderLayer
 from dataset import detokenise
+from tf_data_process import add_padding
 from PIL import Image
 
 
@@ -65,8 +66,8 @@ class OCRModel(tf.keras.Model):
         timg = tf.keras.utils.img_to_array(img)
 
         #TODO move all this stuff into a preprocessing function
-        timg = tf.image.resize_with_pad(timg, target_height=self.image_shape[0], target_width=self.image_shape[1])
-        timg = tf.image.rgb_to_grayscale(timg)
+        timg = add_padding(timg, self.image_shape)
+        timg = tf.image.decode_png(timg)
         timg = tf.cast(timg, tf.float32) * tf.constant(1/255.) 
         timg = timg[tf.newaxis, :]
         patches = tf.image.extract_patches(timg, 
