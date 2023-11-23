@@ -15,7 +15,7 @@ class OCRModel(tf.keras.Model):
                  vocab_size=409094, 
                  num_heads=4,
                  num_layers=2, 
-                 units=256,
+                 units=512,
                  patches_length=2000, 
                  max_length=64, 
                  dropout_rate=0.1
