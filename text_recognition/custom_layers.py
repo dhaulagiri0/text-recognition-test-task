@@ -43,9 +43,8 @@ class SeqEmbedding(tf.keras.layers.Layer):
 
         self.token_embedding = tf.keras.layers.Embedding(
             input_dim=vocab_size,
-            output_dim=depth, #TODO move this into parameters
-            mask_zero=True,
-            trainable=True)
+            output_dim=depth,
+            mask_zero=True,)
         
         #embeddings_initializer=tf.keras.initializers.Constant(embedding_weights),
         
@@ -70,7 +69,7 @@ class SeqEmbedding(tf.keras.layers.Layer):
         return x
     
 class ImageEmbedding(tf.keras.layers.Layer):
-    def __init__(self, patches_length=80, units=256):
+    def __init__(self, patches_length=320, units=256):
         super().__init__()
         self.patches_length = patches_length
         self.units = units

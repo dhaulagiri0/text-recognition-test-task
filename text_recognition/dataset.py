@@ -31,7 +31,7 @@ def getFeatureExtractor():
     return mobilenet
 
 
-def prepare_dataset(ds, batch_size=32, shuffle_buffer=1000, patch_shape=(10, 10)):
+def prepare_dataset(ds, batch_size=32, patch_shape=[25, 25], shuffle_buffer=1000):
 
     trainAug = tf.keras.Sequential(
         [
@@ -53,7 +53,8 @@ def prepare_dataset(ds, batch_size=32, shuffle_buffer=1000, patch_shape=(10, 10)
     
     def getpatches(inputs, label):
         img, input = inputs
-        tensor = tf.image.rgb_to_grayscale(img)
+        if img.shape[-1] != 1: 
+            tensor = tf.image.rgb_to_grayscale(img)
         tensor = tf.cast(tensor, tf.float32) * tf.constant(1/255.) 
         tensor = tensor[tf.newaxis, :]
         patches = tf.image.extract_patches(tensor, 
@@ -61,7 +62,7 @@ def prepare_dataset(ds, batch_size=32, shuffle_buffer=1000, patch_shape=(10, 10)
                                     strides=[1, patch_shape[0], patch_shape[1], 1], 
                                     rates=[1, 1, 1, 1], 
                                     padding="VALID")
-        patches = tf.ensure_shape(patches, (1, 10, 200, 100))
+        patches = tf.ensure_shape(patches, (1, 4, 80, 625))
         patches = tf.reshape(patches, (patches.shape[0], patches.shape[1] * patches.shape[2], patches.shape[-1]))
         patches = tf.squeeze(patches)
         return (patches, input), label

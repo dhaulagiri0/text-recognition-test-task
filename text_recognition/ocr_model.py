@@ -11,7 +11,7 @@ class OCRModel(tf.keras.Model):
                  dictionary, 
                  embedding_weights,
                  image_shape=[100, 2000], # HxW
-                 patch_shape=[10, 10],
+                 patch_shape=[25, 25],
                  vocab_size=409094, 
                  num_heads=4,
                  num_layers=2, 
@@ -66,7 +66,9 @@ class OCRModel(tf.keras.Model):
 
         #TODO move all this stuff into a preprocessing function
         timg = tf.image.resize_with_pad(timg, target_height=self.image_shape[0], target_width=self.image_shape[1])
-        timg = tf.image.rgb_to_grayscale(timg)[tf.newaxis, :]
+        timg = tf.image.rgb_to_grayscale(timg)
+        timg = tf.cast(timg, tf.float32) * tf.constant(1/255.) 
+        timg = timg[tf.newaxis, :]
         patches = tf.image.extract_patches(timg, 
                                     sizes=[1, self.patch_shape[0], self.patch_shape[1], 1], 
                                     strides=[1, self.patch_shape[0], self.patch_shape[1], 1], 

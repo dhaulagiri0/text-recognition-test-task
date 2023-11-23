@@ -37,6 +37,30 @@ def serialize_example(values, keys, fs, d, limit=64):
     example_proto = tf.train.Example(features=tf.train.Features(feature=feature))
     return example_proto.SerializeToString()
 
+def add_padding(image, target_shape=[100, 2000]):
+    tensor = tf.keras.utils.img_to_array(image)
+    if len(tensor.shape) != 4:
+        tensor = tensor[tf.newaxis, :]
+    height = tensor.shape[1]
+    width = tensor.shape[2]
+    target_height = target_shape[0]
+    target_width = target_shape[1]
+
+    height_ratio = (target_height / height)
+    width_ratio = (target_width / width)
+
+    if int(width_ratio * height) > target_shape[0]: # resize height to 100
+        final_width = int(height_ratio * width)
+        tensor = tf.image.resize_with_pad(tensor, target_height, final_width)
+        paddings = tf.constant([[0, 0], [0, 0], [0, target_shape[1] - final_width], [0, 0]])
+    else: # resize width
+        final_height = int(width_ratio * height)
+        tensor = tf.image.resize_with_pad(tensor, final_height, target_width)
+        paddings = tf.constant([[0, 0], [0, target_shape[0] - final_height], [0, 0], [0, 0]])
+    
+    tensor = tf.cast(tf.image.rgb_to_grayscale(tf.pad(tensor, paddings)) , dtype=tf.uint8)
+    return  tf.io.encode_png(tensor)
+
 def getImage(img, height=224, width=224):
     tensor = tf.constant(tf.keras.utils.img_to_array(img), dtype=tf.uint8)
     img_tensor = tf.cast(tf.image.resize_with_pad(tensor, height, width), dtype=tf.uint8)
@@ -81,11 +105,12 @@ def write_record(entries, filename, d):
             img = Image.open(entry["img"])
             input = entry["input"]
             label = entry["label"]
-            try:
-                timg = getImage(img, height=100, width=2000)
-            except:
-                print(entry)
-                continue
+            # try:
+            #timg = getImage(img, height=100, width=2000)
+            timg = add_padding(img, target_shape=[100, 2000])[0]
+            # except:
+            #     print(entry)
+            #     continue
             values = [input, label, timg]
             fs = [_int64_feature, _int64_feature, _bytes_feature]
             keys = ["input", "label", "img"]
