@@ -1,6 +1,6 @@
 import tensorflow as tf
 from ocr_model import OCRModel
-from embedding_utils import load_json_data, load_embedding
+from embedding_utils import load_json_data, load_embedding_json
 from custom_layers import TokenOutput
 from dataset import prepare_dataset, _parse_function
 import datetime
@@ -42,13 +42,13 @@ def train_model(train_ds_path, valid_ds_path, vocab_size=409094, dictionary_path
     train_ds = tf.data.TFRecordDataset(train_ds_path).map(_parse_function)
     valid_ds = tf.data.TFRecordDataset(valid_ds_path).map(_parse_function)
 
-    train_ds = prepare_dataset(train_ds, batch_size=16)
-    valid_ds = prepare_dataset(valid_ds, batch_size=16)
+    train_ds = prepare_dataset(train_ds, batch_size=32)
+    valid_ds = prepare_dataset(valid_ds, batch_size=32)
 
     checkpoint_filepath = 'dataset/checkpoints/'
     model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=checkpoint_filepath,
-        save_weights_only=True,
+        save_weights_only=False,
         monitor='val_masked_acc',
         mode='max',
         save_best_only=True)
@@ -69,10 +69,15 @@ def train_model(train_ds_path, valid_ds_path, vocab_size=409094, dictionary_path
     output_layer.adapt(train_ds.map(lambda inputs, labels: labels))
     
     # embedding, dim = load_embedding("dataset/embedding.txt")
-    model = OCRModel(output_layer, dictionary=vocab_dict, embedding_weights=None)
+    
+    # embedding_weights, dim = load_embedding_json("dataset/embedding.json")
+    # embedding_weights = tf.Variable(embedding_weights, trainable=True)
+    # print("loaded embedding weigths")
+
+    model = OCRModel(output_layer, dictionary=vocab_dict, embedding_weights=None, image_shape=[100, 2000])
     # tf.keras.utils.plot_model(model, to_file="dataset/mode.png", show_shapes=True)
 
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=5e-5),
            loss=masked_loss,
            metrics=[masked_acc])
     

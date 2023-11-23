@@ -90,7 +90,7 @@ def prepare_dataset_(ds, featureExtractor, batch_size=32, shuffle_buffer=1000):
         [
             tf.keras.layers.RandomBrightness(factor=[-0.5, 0.5]),
             tf.keras.layers.RandomContrast(factor=0.5),
-            tf.keras.layers.RandomRotation(factor=[-0.1, 0.1]),
+            # tf.keras.layers.RandomRotation(factor=[-0.1, 0.1]),
         ]
     )
     

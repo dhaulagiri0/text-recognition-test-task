@@ -1,5 +1,4 @@
 import tensorflow as tf
-import embedding_utils as eu
 
 import numpy as np
 import tqdm, collections

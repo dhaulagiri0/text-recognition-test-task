@@ -3,6 +3,7 @@ from bpemb import BPEmb
 import numpy as np
 import os
 import json
+from json import JSONEncoder
 
 DATA_PATH = "dataset/"
 TXT_REL = "mul.txt"
@@ -101,7 +102,13 @@ def load_json_data(path="dataset/train_trans.json"):
     l = json.load(f)
     return l      
 
-def make_embedding(output_path = "dataset/embedding.txt",
+class NumpyArrayEncoder(JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return JSONEncoder.default(self, obj)
+
+def make_embedding(output_path = "dataset/embedding.json",
                    BPEmbPath = "dataset/", 
                    bpemb_name="multi.wiki.bpe.vs409094.d300.w2v.txt", 
                    dict_path = "dataset/vocab_bpemb.json", ):
@@ -112,12 +119,15 @@ def make_embedding(output_path = "dataset/embedding.txt",
     embedding_matrix = {}
 
     for word, embedding in embedding_index.items():
-        embedding_matrix[d[word]] = embedding
+        embedding_matrix[int(d[word])] = embedding
 
+    
     with open(output_path, "w") as f:
-        for key, value in embedding_matrix.items():
-            coeff = np.array2string(value).replace('\n', '')[1:-1]
-            f.writelines(f"{key} {coeff}\n")
+        print(len(embedding_matrix))
+        json.dump(embedding_matrix, f, cls=NumpyArrayEncoder)
+        # for key, value in embedding_matrix.items():
+        #     coeff = np.array2string(value).replace('\n', '')[1:-1]
+        #     f.writelines(f"{key} {coeff}\n")
 
     
 def load_embedding(path):
@@ -127,12 +137,41 @@ def load_embedding(path):
         for i, line in enumerate(f):
             id, coefs = line.split(maxsplit=1)
             coefs = np.fromstring(coefs, "f", sep=" ")
-            embedding[int(id)] = coefs
+            embedding[id] = coefs
     
     dim = len(embedding[0])
     print(f'Found {len(embedding)} word vectors. Of length {dim}')
     return embedding, dim
 
+class Decoder(json.JSONDecoder):
+    def decode(self, s):
+        result = super().decode(s)  # result = super(Decoder, self).decode(s) for Python 2.x
+        return self._decode(result)
+
+    def _decode(self, o):
+        if isinstance(o, str):
+            try:
+                return int(o)
+            except ValueError:
+                return o
+        elif isinstance(o, dict):
+            return {k: self._decode(v) for k, v in o.items()}
+        elif isinstance(o, list):
+            return np.array([self._decode(v) for v in o])
+        else:
+            return o
+
+def load_embedding_json(path):
+
+    embedding = {}
+
+    def keystoint(x):
+        return {int(k): v for k, v in x.items()}
+
+    with open(path) as f:
+        embedding = json.load(f, cls=Decoder, object_hook=keystoint)
+
+    return embedding, len(embedding[0])
 
 # embeddings_index, dim = create_embed_index(os.path.join(dirname, TXT_REL))
 

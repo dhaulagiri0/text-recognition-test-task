@@ -1,9 +1,7 @@
 from pathlib import Path
 import tensorflow as tf
 from custom_layers import DecoderLayer, SeqEmbedding, ImageEmbedding, EncoderLayer
-from embedding_utils import load_json_data
 from dataset import detokenise
-from tf_data_process import getImage
 from PIL import Image
 
 
@@ -12,12 +10,12 @@ class OCRModel(tf.keras.Model):
     def __init__(self, output_layer,
                  dictionary, 
                  embedding_weights,
-                 image_shape=[20, 400], # HxW
+                 image_shape=[100, 2000], # HxW
                  patch_shape=[10, 10],
                  vocab_size=409094, 
                  num_heads=4,
-                 num_layers=2, 
-                 units=256,
+                 num_layers=4, 
+                 units=512,
                  patches_length=80, 
                  max_length=64, 
                  dropout_rate=0.1
@@ -25,7 +23,6 @@ class OCRModel(tf.keras.Model):
         
         super().__init__()
 
-        self.seq_embedding_weights = embedding_weights
         self.max_length = max_length
         self.image_shape = image_shape
         self.patch_shape = patch_shape
