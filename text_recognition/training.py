@@ -43,8 +43,8 @@ def train_model(train_ds_path, valid_ds_path, vocab_size=409094, dictionary_path
     train_ds = tf.data.TFRecordDataset(train_ds_path).map(_parse_function)
     valid_ds = tf.data.TFRecordDataset(valid_ds_path).map(_parse_function)
 
-    train_ds = prepare_dataset(train_ds, batch_size=8, patch_shape=patch_shape)
-    valid_ds = prepare_dataset(valid_ds, batch_size=8, patch_shape=patch_shape)
+    train_ds = prepare_dataset(train_ds, batch_size=8)
+    valid_ds = prepare_dataset(valid_ds, batch_size=8)
 
     checkpoint_filepath = 'dataset/checkpoints/'
     model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(

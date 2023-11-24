@@ -16,7 +16,7 @@ class OCRModel(tf.keras.Model):
                  vocab_size=409094, 
                  num_heads=4,
                  num_layers=2, 
-                 units=512,
+                 units=128,
                  patches_length=2000, 
                  max_length=64, 
                  dropout_rate=0.1
@@ -97,7 +97,6 @@ class OCRModel(tf.keras.Model):
 
     def call(self, inputs):
         patches, tokens = inputs
-
         image_seq = self.image_embedding(patches)
 
         txt_seq = self.seq_embedding(tokens)

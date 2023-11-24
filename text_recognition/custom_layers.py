@@ -78,14 +78,16 @@ class ImageEmbedding(tf.keras.layers.Layer):
         self.pos_encoding = positional_encoding(length=2048, depth=depth)
         self.pos_embedding = tf.keras.layers.Embedding(input_dim=patches_length, output_dim=depth)
 
-        #Nx80x100 -> Nx80x256
-        self.image_embedding = tf.keras.layers.Dense(units=depth, activation="relu")
+        #Nx80x100 -> Nx80xdepth
+        # self.image_embedding = tf.keras.layers.Dense(units=depth, activation="relu")
+        self.image_embedding = tf.keras.layers.Conv2D(depth, 5, 5, activation='relu')
 
         self.add = tf.keras.layers.Add()
 
     def call(self, seq):
         length = tf.shape(seq)[1]
         seq = self.image_embedding(seq) # (batch, seq, depth)
+        seq = tf.keras.layers.Reshape((seq.shape[1] * seq.shape[2], seq.shape[-1]))(seq)
 
         x = tf.range(tf.shape(seq)[1])  # (seq)
         x = x[tf.newaxis, :]  # (1, seq)
