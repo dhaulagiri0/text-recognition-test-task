@@ -12,12 +12,11 @@ class OCRModel(tf.keras.Model):
                  dictionary, 
                  embedding_weights,
                  image_shape=[100, 2000], # HxW
-                 patch_shape=[25, 25],
+                 patch_shape=[10, 10],
                  vocab_size=409094, 
                  num_heads=4,
                  num_layers=2, 
-                 units=128,
-                 patches_length=2000, 
+                 units=256,
                  max_length=64, 
                  dropout_rate=0.1
                  ):
@@ -30,7 +29,7 @@ class OCRModel(tf.keras.Model):
 
         self.seq_embedding = SeqEmbedding(embedding_weights, vocab_size, max_length, units)
 
-        self.image_embedding = ImageEmbedding(patches_length, units)
+        self.image_embedding = ImageEmbedding(image_shape, patch_shape, units)
 
         self.decoder_layers = [
             DecoderLayer(units, num_heads, dropout_rate) 
@@ -61,26 +60,17 @@ class OCRModel(tf.keras.Model):
         :param image: The path to the image file.
         :return: The recognized text from the image.
         """
+        #TODO move all this stuff into a preprocessing function
         img = Image.open(image).convert('RGB')
         initial = self.word_to_token(['<s>']) # (batch, sequence)
         timg = tf.keras.utils.img_to_array(img)
+        timg = tf.cast(timg, tf.float32)
+        timg = tf.math.scalar_mul(1/255., timg)
 
-        #TODO move all this stuff into a preprocessing function
-        timg = add_padding(timg, self.image_shape)
-        timg = tf.image.decode_png(timg)
-        timg = tf.cast(timg, tf.float32) * tf.constant(1/255.) 
-        timg = timg[tf.newaxis, :]
-        patches = tf.image.extract_patches(timg, 
-                                    sizes=[1, self.patch_shape[0], self.patch_shape[1], 1], 
-                                    strides=[1, self.patch_shape[0], self.patch_shape[1], 1], 
-                                    rates=[1, 1, 1, 1], 
-                                    padding="VALID")
-
-        patches = tf.reshape(patches, (patches.shape[0], patches.shape[1] * patches.shape[2], patches.shape[-1]))
         tokens = initial # (batch, sequence)
         for n in range(self.max_length // 2):
             paddings = tf.constant([[0, self.max_length - len(tokens)]])
-            preds = self((patches, tf.cast(tf.pad(tokens, paddings)[tf.newaxis, :], dtype=tf.int64))).numpy()  # (batch, sequence, vocab)
+            preds = self((timg, tf.cast(tf.pad(tokens, paddings)[tf.newaxis, :], dtype=tf.int64))).numpy()  # (batch, sequence, vocab)
             preds = preds[:,-1, :]  #(batch, vocab)
             if temperature==0:
                 next = tf.squeeze(tf.argmax(preds, axis=-1))

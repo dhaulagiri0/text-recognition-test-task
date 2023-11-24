@@ -39,7 +39,7 @@ class GenerateText(tf.keras.callbacks.Callback):
 
 def train_model(train_ds_path, valid_ds_path, vocab_size=409094, dictionary_path="dataset/vocab_bpemb.json"):
     
-    patch_shape = [25, 25]
+    patch_shape = [10, 10]
     train_ds = tf.data.TFRecordDataset(train_ds_path).map(_parse_function)
     valid_ds = tf.data.TFRecordDataset(valid_ds_path).map(_parse_function)
 
