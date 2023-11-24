@@ -14,9 +14,9 @@ class OCRModel(tf.keras.Model):
                  image_shape=[100, 2000], # HxW
                  patch_shape=[10, 10],
                  vocab_size=409094, 
-                 num_heads=4,
-                 num_layers=2, 
-                 units=256,
+                 num_heads=2,
+                 num_layers=1, 
+                 units=128,
                  max_length=64, 
                  dropout_rate=0.1
                  ):
@@ -65,7 +65,7 @@ class OCRModel(tf.keras.Model):
         initial = self.word_to_token(['<s>']) # (batch, sequence)
         timg = tf.keras.utils.img_to_array(img)
         timg = tf.cast(timg, tf.float32)
-        timg = tf.math.scalar_mul(1/255., timg)
+        timg = tf.math.scalar_mul(1/255., timg)[tf.newaxis, :]
 
         tokens = initial # (batch, sequence)
         for n in range(self.max_length // 2):

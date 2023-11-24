@@ -40,16 +40,16 @@ class SeqEmbedding(tf.keras.layers.Layer):
     def __init__(self, embedding_weights, vocab_size=409094, max_length=64, depth=256):
         super().__init__()
 
-        self.pos_embedding = tf.keras.layers.Embedding(input_dim=max_length, output_dim=depth)
+        self.position_encoding = tf.keras.layers.Embedding(input_dim=max_length, output_dim=depth)
 
         self.token_embedding = tf.keras.layers.Embedding(
             input_dim=vocab_size,
             output_dim=depth,
             mask_zero=True,)
-        
         #embeddings_initializer=tf.keras.initializers.Constant(embedding_weights),
-        
+
         self.depth = depth
+        self.max_length = max_length
         self.add = tf.keras.layers.Add()
 
     def compute_mask(self, *args, **kwargs):
@@ -59,16 +59,17 @@ class SeqEmbedding(tf.keras.layers.Layer):
         length = tf.shape(seq)[1]
         seq = self.token_embedding(seq) # (batch, seq, depth)
 
+        # positions = tf.range(start=0, limit=self.max_length, delta=1)
         x = tf.range(tf.shape(seq)[1])  # (seq)
         x = x[tf.newaxis, :]  # (1, seq)
-        x = self.pos_embedding(x)  # (1, seq, depth)
+        x = self.position_encoding(x)  # (1, seq, depth)
 
-        # x *= tf.math.sqrt(tf.cast(self.depth, tf.float32))
-        # x = x + self.pos_encoding[tf.newaxis, :length, :]
+        # x = seq * tf.math.sqrt(tf.cast(self.depth, tf.float32))
+        # x = x + self.position_encoding[tf.newaxis, :length, :]
 
-        return self.add([seq,x])
+        return self.add([seq, x])
         # return x
-    
+
 class ImageEmbedding(tf.keras.layers.Layer):
     def __init__(self, image_shape=[100, 2000], patch_shape=(10, 10), depth=256):
         super().__init__()
@@ -78,23 +79,25 @@ class ImageEmbedding(tf.keras.layers.Layer):
         # self.image_embedding = tf.keras.layers.Dense(units=depth, activation="relu")
         self.image_embedding = tf.keras.layers.Conv2D(depth, patch_shape, patch_shape)
         self.num_patches = (image_shape[0] // patch_shape[0]) * (image_shape[1] // patch_shape[1])
-        self.position_embedding = tf.keras.layers.Embedding(input_dim=self.num_patches, output_dim=depth)
+        self.position_encoding = tf.keras.layers.Embedding(input_dim=self.num_patches, output_dim=depth)
 
         self.add = tf.keras.layers.Add()
+        self.depth = depth
 
     def call(self, seq):
         length = tf.shape(seq)[1]
         seq = self.image_embedding(seq) # (batch, seq, depth)
         seq = tf.keras.layers.Reshape((self.num_patches, seq.shape[-1]))(seq)
-        
-        positions = tf.range(start=0, limit=self.num_patches, delta=1)
-        # x = tf.range(tf.shape(seq)[1])  # (seq)
-        # x = x[tf.newaxis, :]  # (1, seq)
-        # x = self.pos_embedding(x)  # (1, seq, depth)
+
+        # positions = tf.range(start=0, limit=self.num_patches, delta=1)
+        x = tf.range(tf.shape(seq)[1])  # (seq)
+        x = x[tf.newaxis, :]  # (1, seq)
+        x = self.position_encoding(x)  # (1, seq, depth)
         # x = tf.broadcast_to(x, [seq.shape[0], self.patches_length, self.depth])
-        # x *= tf.math.sqrt(tf.cast(self.units, tf.float32))
-        # x = x + self.pos_encoding[tf.newaxis, :length, :]
-        return self.add([seq, self.position_embedding(positions)])
+        # x = seq * tf.math.sqrt(tf.cast(self.depth, tf.float32))
+        # x = x + self.position_encoding[tf.newaxis, :length, :]
+
+        return self.add([seq, x])
         # return x
   
 class CausalSelfAttention(tf.keras.layers.Layer):

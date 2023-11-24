@@ -39,7 +39,7 @@ class GenerateText(tf.keras.callbacks.Callback):
 
 def train_model(train_ds_path, valid_ds_path, vocab_size=409094, dictionary_path="dataset/vocab_bpemb.json"):
     
-    patch_shape = [10, 10]
+    patch_shape = [25, 25]
     train_ds = tf.data.TFRecordDataset(train_ds_path).map(_parse_function)
     valid_ds = tf.data.TFRecordDataset(valid_ds_path).map(_parse_function)
 
@@ -62,8 +62,7 @@ def train_model(train_ds_path, valid_ds_path, vocab_size=409094, dictionary_path
         tensorboard_callback,
         model_checkpoint_callback,
         tf.keras.callbacks.EarlyStopping(
-            patience=5, restore_best_weights=True),
-        GenerateText()]
+            patience=5, restore_best_weights=True)]
     
     vocab_dict = load_json_data(dictionary_path)
     output_layer = TokenOutput(vocab_size, vocab_dict)
@@ -75,7 +74,7 @@ def train_model(train_ds_path, valid_ds_path, vocab_size=409094, dictionary_path
     model = OCRModel(output_layer, dictionary=vocab_dict, embedding_weights=None, image_shape=[100, 2000], patch_shape=patch_shape)
     # tf.keras.utils.plot_model(model, to_file="dataset/mode.png", show_shapes=True)
 
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=5e-5),
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
            loss=masked_loss,
            metrics=[masked_acc])
     
