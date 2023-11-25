@@ -1,6 +1,8 @@
 import tensorflow as tf
 from PIL import Image
 import numpy as np
+import re
+import random
 
 def _int64_feature(value):
     """Returns an int64_list from a bool / enum / int / uint."""
@@ -116,3 +118,29 @@ def write_record(entries, filename, d):
             keys = ["input", "label", "img"]
             example = serialize_example(values, keys, fs, d)
             writer.write(example)
+
+def write_record_short(entries, filename, d):
+  
+    with tf.io.TFRecordWriter(filename) as writer:
+        cnt = 0
+        for entry in entries:
+            if len(entry["tokens"]) > 30: continue
+
+            img = Image.open(entry["img"])
+            input = [31] + entry["tokens"]
+            label = entry["tokens"] + [30]
+            # if not re.search(u'[\u4e00-\u9fff]', input) and random.randint(0, 10) > 4: 
+            #     continue
+            # try:
+            #timg = getImage(img, height=100, width=2000)
+            timg = add_padding(img, target_shape=[150, 450])[0]
+            # except:
+            #     print(entry)
+            #     continue
+            values = [input, label, timg]
+            fs = [_int64_feature, _int64_feature, _bytes_feature]
+            keys = ["input", "label", "img"]
+            example = serialize_example(values, keys, fs, d, limit=32)
+            writer.write(example)
+
+            cnt += 1

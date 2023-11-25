@@ -3,8 +3,8 @@ from einops import rearrange, reduce, repeat
 
 feature_description = {
     'img': tf.io.FixedLenFeature([], tf.string),
-    'input': tf.io.FixedLenFeature([64], tf.int64),
-    'label': tf.io.FixedLenFeature([64], tf.int64)
+    'input': tf.io.FixedLenFeature([32], tf.int64),
+    'label': tf.io.FixedLenFeature([32], tf.int64)
 }
 
 def detokenise(tokens, d):
@@ -72,7 +72,7 @@ def prepare_dataset(ds, batch_size=32, shuffle_buffer=1000):
             .map(prepare, tf.data.AUTOTUNE)
             .map(lambda x, y: ((trainAug(x[0]), x[1]), y), tf.data.AUTOTUNE)
             .map(lambda x, y: ((tf.math.scalar_mul(1/255., x[0]), x[1]), y), tf.data.AUTOTUNE)
-            .map(lambda x, y: ((tf.ensure_shape(x[0], (100, 2000, 1)), x[1]), y), tf.data.AUTOTUNE)
+            .map(lambda x, y: ((tf.ensure_shape(x[0], (150, 450, 1)), x[1]), y), tf.data.AUTOTUNE)
             .apply(tf.data.experimental.ignore_errors())
             .batch(batch_size))
 

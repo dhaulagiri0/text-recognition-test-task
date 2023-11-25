@@ -17,6 +17,7 @@ import translators as ts
 import json, io, os
 import random
 from tqdm import tqdm
+import re
 
 def load_json_data(path="dataset/raw/test_slid.json"):
     f = open(path)
@@ -25,7 +26,9 @@ def load_json_data(path="dataset/raw/test_slid.json"):
 
 def make_image(text, fontsize=10, padding=10, image_background=(255, 255, 255), text_color=(0, 0, 0)):
 
-    font = ImageFont.truetype("dataset/NotoSansSC-VariableFont_wght.ttf", fontsize)
+    fonts = os.listdir("dataset/fonts/")
+    font = ImageFont.truetype(f"dataset/fonts/{fonts[random.randint(0, len(fonts) - 1)]}", fontsize)
+
 
     img = Image.new('RGB', (1, 1), color = image_background)
     d = ImageDraw.Draw(img)
@@ -170,10 +173,10 @@ def make_vocab(entries, path="dataset/vocab.json"):
     with open(path, 'w') as j:
         json.dump(d, j)
 
-def load_json_entries(path="dataset/raw/", dataset="train"):
-    f = open(path + dataset)
-    l = json.load(f)
-    return l     
+# def load_json_entries(path="dataset/raw/", dataset="train"):
+#     f = open(path + dataset)
+#     l = json.load(f)
+#     return l     
 
 def check_piece(pieces, d):
     ps = []
@@ -250,3 +253,78 @@ def process_limited_entries(entries, limit=64, window=5):
                 "tokens": entry["tokens"]
             })
     return new
+
+def tokenise(sequence, word_token):
+    tokens = []
+    for char in sequence:
+        if char in word_token:
+            token = word_token[char]
+        else:
+            print(f"{char} not found in dictionary")
+            word_token[char] = token = len(word_token)
+            # token = word_token["<unk>"]
+        tokens.append(token)
+    return tokens, word_token
+
+# generate short sequences from raw json (around 5 words)
+def gen_short(json_path, output_path, word_token, img_path, generated_len=2):
+
+    entries = load_json_data(json_path)
+
+    new_sequences = []
+    cnt = 0
+    max_height = 0
+    max_width = 0
+    avg_height = 0
+    avg_wdith = 0
+    for entry in entries:
+        sentence = entry["original"]
+        words = sentence.split(" ")
+        end = len(words)
+
+        if not re.search(u'[\u4e00-\u9fff]', sentence) and random.randint(0, 10) > 4:
+            cnt += len(range(0, end, generated_len)) 
+            continue
+        # take generated_len number of words
+        for i in range(0, end, generated_len):
+            d = {}
+            if i + generated_len < end:
+                sequence = words[i: i+generated_len]
+            else:
+                sequence = words[i: end]
+            sequence = " ".join(sequence)
+            d["tokens"], word_token = tokenise(sequence, word_token)
+            d["sequence"] = sequence
+            c = tuple(random.sample(range(0, 255), 3))
+            if random.randint(0, 10) > 3:
+                if random.randint(0, 10) > 3:
+                    c = (255, 255, 255)
+                else:
+                    c = (30, 30, 30)
+            
+            # if not os.path.isfile(f"{img_path}/{cnt}.png"):
+            img = make_image(sequence, 
+                            fontsize=70, 
+                            padding=10, 
+                            image_background=c, 
+                            text_color=tuple(255 - x for x in c))
+            img.save(f"{img_path}/{cnt}.png")
+            avg_height += img.height
+            max_height = max(max_height, img.height)
+            avg_wdith += img.width
+            max_width = max(max_width, img.width)
+            d["img"] = f"{img_path}/{cnt}.png"
+            new_sequences.append(d)
+
+            cnt += 1
+
+    avg_wdith = avg_wdith// cnt
+    avg_height = avg_height // cnt
+
+    print(avg_height, avg_wdith, max_height, max_width)
+
+    with open(output_path, "w") as f:
+        json.dump(new_sequences, f)
+    
+    return new_sequences, word_token
+    

@@ -13,11 +13,11 @@ class OCRModel(tf.keras.Model):
                  embedding_weights,
                  image_shape=[100, 2000], # HxW
                  patch_shape=[10, 10],
-                 vocab_size=409094, 
+                 vocab_size=3724, 
                  num_heads=2,
                  num_layers=1, 
                  units=128,
-                 max_length=64, 
+                 max_length=32, 
                  dropout_rate=0.1
                  ):
         
