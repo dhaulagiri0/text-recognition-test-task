@@ -11,12 +11,12 @@ class OCRModel(tf.keras.Model):
     def __init__(self, output_layer,
                  dictionary, 
                  embedding_weights,
-                 image_shape=[100, 2000], # HxW
+                 image_shape=[150, 450], # HxW
                  patch_shape=[10, 10],
-                 vocab_size=3724, 
-                 num_heads=2,
-                 num_layers=1, 
-                 units=128,
+                 vocab_size=3725, 
+                 num_heads=4,
+                 num_layers=2, 
+                 units=512,
                  max_length=32, 
                  dropout_rate=0.1
                  ):
