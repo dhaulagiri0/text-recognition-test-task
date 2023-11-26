@@ -16,7 +16,7 @@ class OCRModel(tf.keras.Model):
                  vocab_size=3725, 
                  num_heads=4,
                  num_layers=2, 
-                 units=512,
+                 units=128,
                  max_length=32, 
                  dropout_rate=0.1
                  ):
@@ -62,11 +62,11 @@ class OCRModel(tf.keras.Model):
         """
         #TODO move all this stuff into a preprocessing function
         img = Image.open(image).convert('RGB')
-        initial = self.word_to_token(['<s>']) # (batch, sequence)
-        timg = tf.keras.utils.img_to_array(img)
-        timg = tf.cast(timg, tf.float32)
-        timg = tf.math.scalar_mul(1/255., timg)[tf.newaxis, :]
+        timg = add_padding(img, target_shape=[150, 450], encode=False)
+        timg = tf.math.scalar_mul(1/255., timg)
+        print(timg.shape)
 
+        initial = self.word_to_token(['<s>']) # (batch, sequence)
         tokens = initial # (batch, sequence)
         for n in range(self.max_length // 2):
             paddings = tf.constant([[0, self.max_length - len(tokens)]])

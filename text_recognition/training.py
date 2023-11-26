@@ -59,6 +59,7 @@ def train_model(train_ds_path, valid_ds_path, vocab_size=409094, dictionary_path
     tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=0, write_graph=False)
 
     callbacks = [
+        GenerateText(),
         tensorboard_callback,
         model_checkpoint_callback,
         tf.keras.callbacks.EarlyStopping(
@@ -86,7 +87,7 @@ def train_model(train_ds_path, valid_ds_path, vocab_size=409094, dictionary_path
 
     history = model.fit(
         train_ds.repeat(),
-        steps_per_epoch=1000,
+        steps_per_epoch=1,
         validation_data=valid_ds.repeat(),
         validation_steps=200,
         epochs=100,
