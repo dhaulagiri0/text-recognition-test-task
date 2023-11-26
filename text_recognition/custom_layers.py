@@ -237,6 +237,8 @@ class TokenOutput(tf.keras.layers.Layer):
         self.bias = log_p
         self.bias[counts_arr==0] = -1e9
 
+        print(self.bias.shape, self.bias)
+
     def call(self, x):
         x = self.dense(x)
 

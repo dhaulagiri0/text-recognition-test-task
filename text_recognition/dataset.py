@@ -1,5 +1,4 @@
 import tensorflow as tf
-from einops import rearrange, reduce, repeat
 
 feature_description = {
     'img': tf.io.FixedLenFeature([], tf.string),

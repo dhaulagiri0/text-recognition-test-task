@@ -14,9 +14,9 @@ class OCRModel(tf.keras.Model):
                  image_shape=[150, 450], # HxW
                  patch_shape=[10, 10],
                  vocab_size=3725, 
-                 num_heads=4,
-                 num_layers=2, 
-                 units=128,
+                 num_heads=8,
+                 num_layers=4, 
+                 units=512,
                  max_length=32, 
                  dropout_rate=0.1
                  ):

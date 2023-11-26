@@ -26,7 +26,7 @@ def masked_acc(labels, preds):
 
 class GenerateText(tf.keras.callbacks.Callback):
     def __init__(self):
-        self.image = "data/public_data/1.png"
+        self.image = "data/public_data/8.png"
 
     def on_epoch_end(self, epochs=None, logs=None):
         print()
@@ -37,19 +37,19 @@ class GenerateText(tf.keras.callbacks.Callback):
         print()
 
 
-def train_model(train_ds_path, valid_ds_path, vocab_size=409094, dictionary_path="dataset/vocab_bpemb.json"):
+def train_model(train_ds_path, valid_ds_path, vocab_size=3725, dictionary_path="dataset/vocab.json", weights=None):
     
     patch_shape = [25, 25]
     train_ds = tf.data.TFRecordDataset(train_ds_path).map(_parse_function)
     valid_ds = tf.data.TFRecordDataset(valid_ds_path).map(_parse_function)
 
-    train_ds = prepare_dataset(train_ds, batch_size=8)
-    valid_ds = prepare_dataset(valid_ds, batch_size=8)
+    train_ds = prepare_dataset(train_ds, batch_size=32)
+    valid_ds = prepare_dataset(valid_ds, batch_size=32)
 
-    checkpoint_filepath = 'dataset/checkpoints/'
+    checkpoint_filepath = 'dataset/checkpoints/' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=checkpoint_filepath,
-        save_weights_only=True,
+        save_weights_only=False,
         monitor='val_masked_acc',
         mode='max',
         save_best_only=True)
@@ -59,26 +59,32 @@ def train_model(train_ds_path, valid_ds_path, vocab_size=409094, dictionary_path
     tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=0, write_graph=False)
 
     callbacks = [
-        GenerateText(),
         tensorboard_callback,
         model_checkpoint_callback,
         tf.keras.callbacks.EarlyStopping(
-            patience=5, restore_best_weights=True)]
+            patience=5, restore_best_weights=True),
+        GenerateText(),]
     
     vocab_dict = load_json_data(dictionary_path)
-    output_layer = TokenOutput(vocab_size, vocab_dict)
-    output_layer.adapt(train_ds.map(lambda inputs, labels: labels))
     
-    # embedding_weights, dim = load_embedding_json("dataset/embedding.json")
-    # print("loaded embedding weigths")
+    if weights:
+        model = tf.keras.models.load_model(weights, custom_objects={
+            "masked_acc"  : masked_acc,
+            "masked_loss" : masked_loss
+        })
+    else:
+        output_layer = TokenOutput(vocab_size, vocab_dict)
+        output_layer.adapt(train_ds.map(lambda inputs, labels: labels))
+        
+        # embedding_weights, dim = load_embedding_json("dataset/embedding.json")
+        # print("loaded embedding weigths")
 
-    model = OCRModel(output_layer, dictionary=vocab_dict, embedding_weights=None, image_shape=[150, 450], patch_shape=patch_shape)
-    # tf.keras.utils.plot_model(model, to_file="dataset/mode.png", show_shapes=True)
+        model = OCRModel(output_layer, dictionary=vocab_dict, embedding_weights=None, image_shape=[150, 450], patch_shape=patch_shape)
+        # tf.keras.utils.plot_model(model, to_file="dataset/mode.png", show_shapes=True)
 
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
-           loss=masked_loss,
-           metrics=[masked_acc])
-    
+    loss=masked_loss,
+    metrics=[masked_acc])        
     # for (inputs, ex_labels) in train_ds.take(1):
 
     #     model(inputs)
@@ -87,12 +93,12 @@ def train_model(train_ds_path, valid_ds_path, vocab_size=409094, dictionary_path
 
     history = model.fit(
         train_ds.repeat(),
-        steps_per_epoch=1,
+        steps_per_epoch=2000,
         validation_data=valid_ds.repeat(),
-        validation_steps=200,
+        validation_steps=400,
         epochs=100,
         callbacks=callbacks)
     
 if __name__ == '__main__':
 
-    train_model("dataset/records_short/train.tfrecord", "dataset/records_short/valid.tfrecord")
+    train_model("dataset/records_short/train.tfrecord", "dataset/records_short/valid.tfrecord", weights="dataset/checkpoints/20231126-210159")
