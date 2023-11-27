@@ -77,7 +77,7 @@ class ImageEmbedding(tf.keras.layers.Layer):
 
         #Nx80x100 -> Nx80xdepth
         # self.image_embedding = tf.keras.layers.Dense(units=depth, activation="relu")
-        self.image_embedding = tf.keras.layers.Conv2D(depth, patch_shape, patch_shape)
+        self.image_embedding = tf.keras.layers.Conv2D(depth, patch_shape, patch_shape, activation="linear")
         self.num_patches = (image_shape[0] // patch_shape[0]) * (image_shape[1] // patch_shape[1])
         self.position_encoding = tf.keras.layers.Embedding(input_dim=self.num_patches, output_dim=depth)
 
@@ -236,8 +236,6 @@ class TokenOutput(tf.keras.layers.Layer):
 
         self.bias = log_p
         self.bias[counts_arr==0] = -1e9
-
-        print(self.bias.shape, self.bias)
 
     def call(self, x):
         x = self.dense(x)

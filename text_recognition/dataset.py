@@ -9,9 +9,10 @@ feature_description = {
 def detokenise(tokens, d):
     sentence = ""
     for token in tokens:
-        word = d[token]
-        if word not in ["<s>", "</s>", "<unk>"]:
-            sentence += word
+        if token != 0:
+            word = d[token]
+            if word not in ["<s>", "</s>"]:
+                sentence += word
     return sentence.replace("▁", " ")
 
 def _parse_function(example_proto):

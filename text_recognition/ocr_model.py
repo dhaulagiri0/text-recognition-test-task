@@ -2,7 +2,7 @@ from pathlib import Path
 import tensorflow as tf
 from custom_layers import DecoderLayer, SeqEmbedding, ImageEmbedding, EncoderLayer
 from dataset import detokenise
-from tf_data_process import add_padding
+from tf_data_process import TfDataProcessor
 from PIL import Image
 
 
@@ -18,8 +18,7 @@ class OCRModel(tf.keras.Model):
                  num_layers=4, 
                  units=512,
                  max_length=32, 
-                 dropout_rate=0.1
-                 ):
+                 dropout_rate=0.2):
         
         super().__init__()
 
@@ -40,18 +39,32 @@ class OCRModel(tf.keras.Model):
             for n in range(num_layers)]
         
         self.output_layer = output_layer
-        self.word_index = dictionary
-        self.index_word = {v:k for k, v in self.word_index.items()}
+        self.word_2_token = dictionary
+        self.token_2_word = {v : k for k, v in self.word_2_token.items()}
 
-    def word_to_token(self, pieces):
+    # converts an entire sequence to tokens
+    def words_to_token(self, pieces):
         tokens = []
         for piece in pieces:
-            if piece in self.word_index:
-                tokens.append(self.word_index[piece])
+            if piece in self.word_2_token:
+                tokens.append(self.word_2_token[piece])
             else:
-                tokens.append(self.word_index["<unk>"])
+                tokens.append(self.word_2_token["<unk>"])
 
         return tokens
+    
+    # expects image to be a path
+    def img_preprocess(self, image):
+
+        img = Image.open(image).convert('RGB')
+        # padding
+        timg = TfDataProcessor.add_padding(img, target_shape=[150, 450])
+        # grayscale
+        timg = tf.image.rgb_to_grayscale(timg)
+        # norm
+        timg = tf.math.scalar_mul(1/255., timg)
+        
+        return timg
 
     def recognize_text(self, image: Path, temperature=1) -> str:
         """
@@ -60,29 +73,35 @@ class OCRModel(tf.keras.Model):
         :param image: The path to the image file.
         :return: The recognized text from the image.
         """
-        #TODO move all this stuff into a preprocessing function
-        img = Image.open(image).convert('RGB')
-        timg = add_padding(img, target_shape=[150, 450], encode=False)
-        timg = tf.math.scalar_mul(1/255., timg)
-        print(timg.shape)
+        timg = self.img_preprocess(image)
 
-        initial = self.word_to_token(['<s>']) # (batch, sequence)
+        initial = self.words_to_token(['<s>']) # (batch, sequence)
         tokens = initial # (batch, sequence)
-        for n in range(self.max_length // 2):
+
+        for n in range(self.max_length):
+            
+            # process tokens for input
             paddings = tf.constant([[0, self.max_length - len(tokens)]])
-            preds = self((timg, tf.cast(tf.pad(tokens, paddings)[tf.newaxis, :], dtype=tf.int64))).numpy()  # (batch, sequence, vocab)
+            cur_tok =  tf.cast(tf.pad(tokens, paddings)[tf.newaxis, :], dtype=tf.int64)
+
+            preds = self((timg, cur_tok)).numpy()  # (batch, sequence, vocab)
             preds = preds[:,-1, :]  #(batch, vocab)
+            
             if temperature==0:
                 next = tf.squeeze(tf.argmax(preds, axis=-1))
             else:
                 next = tf.squeeze(tf.random.categorical(preds/temperature, num_samples=1))
+
+            # update tokens
             tokens = tokens + [next.numpy().tolist()]# (batch, sequence) 
 
-            if next == self.word_index['</s>']:
+            if next == self.word_2_token['</s>']:
                 break
-        
+
+        # debug printing
         print(tokens)
-        return detokenise(tokens, self.index_word)
+
+        return detokenise(tokens, self.token_2_word)
 
 
     def call(self, inputs):

@@ -1,6 +1,6 @@
 import tensorflow as tf
 from PIL import Image
-import json
+import json, tqdm
 
 """
 Generates tfrecords from json files containing
@@ -30,7 +30,7 @@ class TfDataProcessor():
         self.max_sequence_length = max_sequence_length
 
         if record_path:
-            self.record_path     = record_path
+            self.record_path     = f"{record_path}/{dataset_name}.tfrecord"
         else:
             self.record_path     = None
             self.output_path     = output_path
@@ -73,7 +73,7 @@ class TfDataProcessor():
             # pads the text input and label to 32 characters
             if key != "img":
                 paddings = tf.constant([[0, self.max_sequence_length - len(value)]])
-                value = tf.pad(value, paddings, constant_values=self.word_2_token["<unk>"])
+                value = tf.pad(value, paddings, constant_values=0)
                 tensor = f(value)
                 feature[key] = tensor
             else:
@@ -125,14 +125,15 @@ class TfDataProcessor():
 
         d = self.word_2_token
         
-        with tf.io.TFRecordWriter(f"{self.output_path}/{self.dataset_name}") as writer:
+        with tf.io.TFRecordWriter(f"{self.output_path}/{self.dataset_name}.tfrecord") as writer:
             cnt = 0
-            for entry in self.short_data:
+            for entry in tqdm.tqdm(self.short_data):
                 if len(entry["tokens"]) > (self.max_sequence_length - 2): continue
 
                 img = Image.open(entry["img"])
-                input = [d["<s>"]] + entry["tokens"]
-                label = entry["tokens"] + [d["</s>"]]
+                tokens = [i + 1 for i in entry["tokens"]]
+                input = [d["<s>"]] + tokens
+                label = tokens + [d["</s>"]]
 
                 timg = self.add_padding(img, target_shape=self.target_img_shape)[0]
                 timg = tf.image.rgb_to_grayscale(timg)
@@ -191,7 +192,6 @@ class TfDataProcessor():
                     .map(lambda x, y: ((tf.math.scalar_mul(1/255., x[0]), x[1]), y), tf.data.AUTOTUNE)
                     .map(lambda x, y: ((tf.ensure_shape(x[0], self.target_img_shape + [1]), x[1]), y),
                                         tf.data.AUTOTUNE)
-                    .apply(tf.data.experimental.ignore_errors())
                     .batch(batch_size))
 
             return (ds

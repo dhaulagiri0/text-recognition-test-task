@@ -341,10 +341,10 @@ class JsonDataCreator():
 ### ------------- legacy functions ------------- ###
 
 
-# def load_json_data(path="dataset/raw/test_slid.json"):
-#     f = open(path)
-#     l = json.load(f)
-#     return l   
+def load_json_data(path="dataset/raw/test_slid.json"):
+    f = open(path)
+    l = json.load(f)
+    return l   
 
 # def make_image(text, fontsize=10, padding=10, image_background=(255, 255, 255), text_color=(0, 0, 0)):
 
