@@ -16,7 +16,7 @@ from PIL import ImageFont
 import translators as ts
 import json, os
 import random
-from tqdm import tqdm
+import tqdm
 import re
 
 """
@@ -50,12 +50,13 @@ class JsonDataCreator():
     def __init__(self,
                  maven_path      = "dataset/",
                  dataset_name    = "train",
-                 translate_rate  = 0.3,
+                 translate_rate  = .5,
                  vocab_path      = "dataset/vocab.json",
-                 img_path        = "dataset/test_imgs",
-                 font_size       = 70,
+                 img_path        = "dataset/short_imgs",
+                 font_size       = 50,
                  font_dir        = "dataset/fonts",
-                 short_data_path = None):
+                 short_data_path = None,
+                 clean_path      = None):
         
         self.maven_path   = maven_path
         self.dataset_name = dataset_name
@@ -68,7 +69,7 @@ class JsonDataCreator():
 
         # get the base dataset
         # which is a list of sentences
-        if not short_data_path:
+        if not short_data_path and not clean_path:
             self.base = self.load_maven()
 
 
@@ -77,14 +78,17 @@ class JsonDataCreator():
             # the vocab file should be a dictionary of
             # word to token
             if vocab_path and os.path.isfile(vocab_path):
-                self.word_2_token = self._load_json_data(vocab_path)
+                self.word_2_token = JsonDataCreator._load_json_data(vocab_path)
             else:
                 self.word_2_token = self.create_vocab()
 
             self.vocab_size = len(self.word_2_token)
 
+        elif short_data_path:
+            self.short_data = JsonDataCreator._load_json_data(short_data_path)
         else:
-            self.short_data = self._load_json_data(short_data_path)
+            self.base =  JsonDataCreator._load_json_data(clean_path)
+            self.word_2_token = JsonDataCreator._load_json_data(vocab_path)
 
     # simple method to laod a json file
     def _load_json_data(path):
@@ -93,15 +97,16 @@ class JsonDataCreator():
         return l   
 
     # dealing with the MAVEN dataset
-    def load_maven(self):
+    def load_maven(self, export=False, output="dataset/"):
 
         path = self.maven_path
         dataset = self.dataset_name
         sentences = []
-
+        chi = []
+        en = []
         with open(f"{path}/{dataset}.jsonl") as f:
             total = 0
-            for i, line in enumerate(f):
+            for i, line in tqdm.tqdm(enumerate(f)):
                 total = max(total, i)
                 # I only need cur_dict["content"], these are the sentences in the wiki page
                 cur_dict = json.loads(line)
@@ -116,10 +121,24 @@ class JsonDataCreator():
                     sentences.append({"sentence"  : sentence,
                                       "translated": translated,
                                       "mixed"     : mixed})
-                if i > 1: break
+                    if export:
+                        chi.append(translated)
+                        en.append(sentence)
+                if i > 2: break
             print(f"loaded {total} articles for {dataset}. Totalling {len(sentences)} sentences")
 
+        if export:
+            with open(f"{output}/chi.txt", "w") as f:
+                for c in chi:
+                    f.writelines(c + "\n")
+
+            with open(f"{output}/en.txt", "w") as f:
+                for c in en:
+                    f.writelines(c + "\n")
+
+        self.sentence = sentence
         return sentences
+
     
     """
      randomly sample from two strings to create one string
@@ -183,7 +202,7 @@ class JsonDataCreator():
             if char in word_2_token:
                 token = word_2_token[char]
             else:
-                print(f"{char} not found in dictionary")
+                # print(f"{char} not found in dictionary")
                 if add_to_dict:
                     word_2_token[char] = token = len(word_2_token)
                 else:
@@ -231,7 +250,7 @@ class JsonDataCreator():
     vocab size, increases flexibility and also allow the 
     model to converge much faster
     """
-    def gen_short(self, piece_length=2, create_imgs=True):
+    def gen_short(self, piece_length=8, create_imgs=True):
 
         base         = self.base
         img_path     = self.img_path
@@ -243,7 +262,7 @@ class JsonDataCreator():
         avg_height = 0
         avg_wdith = 0
 
-        for entry in base:
+        for entry in tqdm.tqdm(base):
 
             en    = entry["sentence"]
             en_tokens, en_pieces = self.split_sentence(en, piece_length)

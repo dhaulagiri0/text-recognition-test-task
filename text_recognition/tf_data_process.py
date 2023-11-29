@@ -1,6 +1,7 @@
 import tensorflow as tf
 from PIL import Image
 import json, tqdm
+import sentencepiece as spm
 
 """
 Generates tfrecords from json files containing
@@ -19,15 +20,17 @@ class TfDataProcessor():
     def __init__(self,
                  dataset_name        = "train",
                  short_data_path     = "dataset/short_json",
-                 dict_path           = "dataset/vocab.json",
+                 dict_path           = "dataset/vocab_piece.json",
                  output_path         = "dataset/records_short",
                  max_sequence_length = 32,
                  target_img_shape    = [150, 450],
-                 record_path         = None):
+                 record_path         = None,
+                 spm_model_path      = "dataset/engchi.model"):
         
         self.dataset_name        = dataset_name
         self.target_img_shape    = target_img_shape
         self.max_sequence_length = max_sequence_length
+        self.spm_model           = spm.SentencePieceProcessor(model_file=spm_model_path)
 
         if record_path:
             self.record_path     = f"{record_path}/{dataset_name}.tfrecord"
@@ -128,10 +131,12 @@ class TfDataProcessor():
         with tf.io.TFRecordWriter(f"{self.output_path}/{self.dataset_name}.tfrecord") as writer:
             cnt = 0
             for entry in tqdm.tqdm(self.short_data):
-                if len(entry["tokens"]) > (self.max_sequence_length - 2): continue
+                sequence = entry["sequence"]
+                tokens = self.spm_model.EncodeAsIds(sequence)
+                if len(tokens) > (self.max_sequence_length - 2): continue
 
                 img = Image.open(entry["img"])
-                tokens = [i + 1 for i in entry["tokens"]]
+                # tokens = [i + 1 for i in entry["tokens"]]
                 input = [d["<s>"]] + tokens
                 label = tokens + [d["</s>"]]
 

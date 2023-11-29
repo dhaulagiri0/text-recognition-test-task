@@ -13,12 +13,12 @@ class OCRModel(tf.keras.Model):
                  embedding_weights,
                  image_shape=[150, 450], # HxW
                  patch_shape=[10, 10],
-                 vocab_size=3725, 
+                 vocab_size=10000, 
                  num_heads=8,
                  num_layers=4, 
                  units=512,
                  max_length=32, 
-                 dropout_rate=0.2):
+                 dropout_rate=0.5):
         
         super().__init__()
 
@@ -54,11 +54,12 @@ class OCRModel(tf.keras.Model):
         return tokens
     
     # expects image to be a path
-    def img_preprocess(self, image):
+    @staticmethod
+    def img_preprocess(image, image_shape):
 
         img = Image.open(image).convert('RGB')
         # padding
-        timg = TfDataProcessor.add_padding(img, target_shape=[150, 450])
+        timg = TfDataProcessor.add_padding(img, target_shape=image_shape)
         # grayscale
         timg = tf.image.rgb_to_grayscale(timg)
         # norm
@@ -73,11 +74,11 @@ class OCRModel(tf.keras.Model):
         :param image: The path to the image file.
         :return: The recognized text from the image.
         """
-        timg = self.img_preprocess(image)
+        timg = self.img_preprocess(image, self.image_shape)
 
         initial = self.words_to_token(['<s>']) # (batch, sequence)
         tokens = initial # (batch, sequence)
-
+    
         for n in range(self.max_length):
             
             # process tokens for input
@@ -121,6 +122,12 @@ class OCRModel(tf.keras.Model):
 
         txt_seq = self.output_layer(txt_seq)
 
+        try:
+            # Drop the keras mask, so it doesn't scale the losses/metrics.
+            # b/250038731
+            del txt_seq._keras_mask
+        except AttributeError:
+            pass
         return txt_seq
 
 

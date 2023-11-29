@@ -10,6 +10,7 @@ from dataset import detokenise
 
 # losses and acc matrices defined by tensorflow for transformer models
 def masked_loss(labels, preds):  
+
     loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels, preds)
 
     mask = (labels != 0) & (loss < 1e8) 
@@ -40,20 +41,20 @@ class GenerateText(tf.keras.callbacks.Callback):
                 print(result)
             print()
 
-def train_model(ds_path="dataset/records_short_new", 
-                dictionary_path="dataset/vocab.json", 
+def train_model(ds_path="dataset/spm_records", 
+                dictionary_path="dataset/vocab_piece.json", 
                 patch_shape = [25, 25], 
                 image_shape=[150, 450], 
                 batch_size=32, 
                 weights=None):
     
     vocab_dict = load_json_data(dictionary_path)
-    vocab_size = len(vocab_dict) + 1 # +1 for 0 padding
+    vocab_size = len(vocab_dict) # +1 for 0 padding
 
-    train_ds = TfDataProcessor("train", record_path=ds_path)
+    train_ds = TfDataProcessor("train", record_path=ds_path, target_img_shape=image_shape)
     train_ds = train_ds.prepare_dataset(batch_size=batch_size)
 
-    valid_ds = TfDataProcessor("valid", record_path=ds_path)
+    valid_ds = TfDataProcessor("valid", record_path=ds_path, target_img_shape=image_shape)
     valid_ds = valid_ds.prepare_dataset(batch_size=batch_size)
     
     # train_ds = tf.data.TFRecordDataset(train_ds_path).map(_parse_function)
@@ -102,10 +103,10 @@ def train_model(ds_path="dataset/records_short_new",
                          patch_shape=patch_shape, 
                          vocab_size=vocab_size,
                          num_heads=8,
-                         num_layers=4, 
+                         num_layers=12, 
                          units=512,
                          max_length=32, 
-                         dropout_rate=0.2)
+                         dropout_rate=0.1)
 
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
         loss=masked_loss,
@@ -113,17 +114,17 @@ def train_model(ds_path="dataset/records_short_new",
 
         history = model.fit(
             train_ds.repeat(),
-            steps_per_epoch=2000,
+            steps_per_epoch=4000,
             validation_data=valid_ds.repeat(),
-            validation_steps=400,
+            validation_steps=800,
             epochs=100,
             callbacks=callbacks)
         
 if __name__ == '__main__':
 
-    train_model(ds_path="dataset/records_short_new", 
-                dictionary_path="dataset/vocab.json", 
+    train_model(ds_path="dataset/spm_records", 
+                dictionary_path="dataset/vocab_piece.json", 
                 patch_shape = [25, 25], 
-                image_shape=[150, 450], 
-                batch_size=32, 
+                image_shape=[75, 450], 
+                batch_size=8, 
                 weights=None)
