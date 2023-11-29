@@ -18,6 +18,8 @@ import json, os
 import random
 import tqdm
 import re
+import cv2
+import numpy as np
 
 """
 A class to generate usable datasets from Maven
@@ -356,6 +358,33 @@ class JsonDataCreator():
         return tokens_list, pieces_list
 
 
+# def getBbox(image):
+
+    
+#     image = cv2.imread(image)
+#     orig = image.copy()
+#     (H, W) = image.shape[:2]
+
+#     (newW, newH) = (W - W%32, H - H%32)
+#     # rW = W / float(newW)
+#     # rH = H / float(newH)
+
+#     image = cv2.resize(image, (newW, newH))
+#     (H, W) = image.shape[:2]
+#     print(H, W)
+
+#     layerNames = [
+# 	"feature_fusion/Conv_7/Sigmoid",
+# 	"feature_fusion/concat_3"]
+
+#     net = cv2.dnn.readNet("dataset/frozen_east_text_detection.pb")
+
+#     blob = cv2.dnn.blobFromImage(image, 1.0, (W, H),
+#         (123.68, 116.78, 103.94), swapRB=True, crop=False)
+#     net.setInput(blob)
+#     (scores, geometry) = net.forward(layerNames)
+    
+#     return geometry
 
 ### ------------- legacy functions ------------- ###
 

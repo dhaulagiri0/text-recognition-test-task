@@ -4,6 +4,8 @@ from custom_layers import DecoderLayer, SeqEmbedding, ImageEmbedding, EncoderLay
 from dataset import detokenise
 from tf_data_process import TfDataProcessor
 from PIL import Image
+import cv2
+import numpy as np
 
 
 class OCRModel(tf.keras.Model):
@@ -57,7 +59,6 @@ class OCRModel(tf.keras.Model):
     @staticmethod
     def img_preprocess(image, image_shape):
 
-        img = Image.open(image).convert('RGB')
         # padding
         timg = TfDataProcessor.add_padding(img, target_shape=image_shape)
         # grayscale
@@ -67,13 +68,8 @@ class OCRModel(tf.keras.Model):
         
         return timg
 
-    def recognize_text(self, image: Path, temperature=1) -> str:
-        """
-        This method takes an image file as input and returns the recognized text from the image.
+    def detect_one(self, image, temperature):
 
-        :param image: The path to the image file.
-        :return: The recognized text from the image.
-        """
         timg = self.img_preprocess(image, self.image_shape)
 
         initial = self.words_to_token(['<s>']) # (batch, sequence)
@@ -99,10 +95,28 @@ class OCRModel(tf.keras.Model):
             if next == self.word_2_token['</s>']:
                 break
 
-        # debug printing
-        print(tokens)
+    def recognize_text(self, image: Path, temperature=1, get_patches=False) -> str:
+        """
+        This method takes an image file as input and returns the recognized text from the image.
 
-        return detokenise(tokens, self.token_2_word)
+        :param image: The path to the image file.
+        :return: The recognized text from the image.
+        """
+        img = Image.open(image).convert('RGB')
+        # divide a large image into text blobs if necessary
+        if get_patches:
+            image_list = OCRModel.getSubImages(img)
+        else:
+            image_list = [img]
+        
+        overall = ""
+        for image in image_list:
+
+            tokens = self.detect_one(img, temperature)
+            text = detokenise(tokens, self.token_2_word)
+            overall = f"{text.strip()}\n" + overall
+
+        return overall.strip("\n")
 
 
     def call(self, inputs):
@@ -129,6 +143,50 @@ class OCRModel(tf.keras.Model):
         except AttributeError:
             pass
         return txt_seq
+    
+    # uses some cv2 contouring techniques to get rows of text in a image from the bottom up
+    def getSubImages(img, padding=0.0):
+
+        (H, W) = img.shape[:2]
+        (padding_h, padding_w) = (int(H * padding), int(W * padding))
+        # convert to grayscale
+        # adjusted = cv2.convertScaleAbs(img.numpy(), alpha=1.5)
+        gray = cv2.cvtColor(img.numpy(), cv2.COLOR_BGR2GRAY)
+
+        # threshold
+        thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)[1]
+        avg_color_per_row = np.average(thresh, axis=0)
+        avg_color = np.average(avg_color_per_row, axis=0)
+
+        if avg_color > 255 / 2:
+            # invert
+            thresh = 255 - thresh
+
+        # apply horizontal morphology close
+        kernel = np.ones((5 , 100), np.uint8)
+        morph = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
+
+        # get external contours
+        contours = cv2.findContours(morph, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        contours = contours[0] if len(contours) == 2 else contours[1]
+
+        # extract tensor patches
+        patches = []
+        # convert to bounding box coordinates and sort by row
+        bboxes = list(map(cv2.boundingRect, contours))
+        for bbox in bboxes:
+            x,y,w,h = bbox
+            hs = max(0, y-padding_h)
+            he = min(y+h+padding_h, H)
+
+            ws = max(0, x-padding_w)
+            we = min(x+w+padding_w, W)
+
+            patch= img[hs:he, ws:we, :]
+            patches.append(patch)
+        
+        return patches
+
 
 
     
