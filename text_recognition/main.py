@@ -2,9 +2,7 @@ from pathlib import Path
 
 from ocr_model import OCRModel
 from evaluation import evaluate_model
-import tensorflow as tf
-# this library provides multi language text embeddings
-import os 
+import os, easyocr
 
 DATA_PATH = "dataset/"
 

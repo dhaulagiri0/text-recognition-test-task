@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 import numpy as np
-import tqdm, collections
+import tqdm, collections, einops
 
 def positional_encoding(length, depth):
   depth = depth/2
@@ -18,35 +18,27 @@ def positional_encoding(length, depth):
 
   return tf.cast(pos_encoding, dtype=tf.float32)
 
-# class PositionalEmbedding(tf.keras.layers.Layer):
-#   def __init__(self, vocab_size, d_model):
-#     super().__init__()
-#     self.d_model = d_model
-#     self.embedding = tf.keras.layers.Embedding(vocab_size, d_model, mask_zero=True) 
-#     self.pos_encoding = positional_encoding(length=2048, depth=d_model)
-
-#   def compute_mask(self, *args, **kwargs):
-#     return self.embedding.compute_mask(*args, **kwargs)
-
-#   def call(self, x):
-#     length = tf.shape(x)[1]
-#     x = self.embedding(x)
-#     # This factor sets the relative scale of the embedding and positonal_encoding.
-#     x *= tf.math.sqrt(tf.cast(self.d_model, tf.float32))
-#     x = x + self.pos_encoding[tf.newaxis, :length, :]
-#     return x
 
 class SeqEmbedding(tf.keras.layers.Layer):
-    def __init__(self, embedding_weights, vocab_size=10000, max_length=64, depth=256):
+    def __init__(self, embedding_weights, vocab_size=10000, max_length=32, depth=300):
         super().__init__()
 
         # self.position_encoding = tf.keras.layers.Embedding(input_dim=max_length, output_dim=depth)
         self.position_encoding = positional_encoding(length=max_length, depth=depth)
 
+        hits = 0
+        embedding_matrix = np.zeros((vocab_size, 300))
+        for i ,vector in embedding_weights.items():
+            embedding_matrix[i] = vector
+            hits += 1
+        print(f"Converted {hits} words")
+
         self.token_embedding = tf.keras.layers.Embedding(
             input_dim=vocab_size,
-            output_dim=depth,
-            mask_zero=True,)
+            output_dim=300,
+            mask_zero=True,
+            weights=[embedding_matrix],
+            trainable=True)
         #embeddings_initializer=tf.keras.initializers.Constant(embedding_weights),
 
         self.depth = depth
@@ -59,6 +51,7 @@ class SeqEmbedding(tf.keras.layers.Layer):
     def call(self, seq):
         length = tf.shape(seq)[1]
         seq = self.token_embedding(seq) # (batch, seq, depth)
+        seq = tf.pad(seq, paddings=[[0, 0], [0, 0], [0, self.depth - tf.shape(seq)[-1]]])
 
         # x = tf.range(tf.shape(seq)[1])  # (seq)
         # x = x[tf.newaxis, :]  # (1, seq)
@@ -71,31 +64,48 @@ class SeqEmbedding(tf.keras.layers.Layer):
         # return x
 
 class ImageEmbedding(tf.keras.layers.Layer):
-    def __init__(self, image_shape=[75, 450], patch_shape=(10, 10), depth=256):
+    def __init__(self, image_shape=[75, 450], patch_shape=(25, 25), depth=256):
         super().__init__()
         self.depth = depth
 
-        # self.image_embedding = tf.keras.layers.Dense(units=depth, activation="relu")
-        self.image_embedding = tf.keras.layers.Conv2D(depth, patch_shape, patch_shape)
+        self.projection = tf.keras.layers.Dense(units=depth, activation="linear")
+        # self.image_embedding = tf.keras.layers.Conv2D(depth, patch_shape, patch_shape, activation="linear")
         self.num_patches = (image_shape[0] // patch_shape[0]) * (image_shape[1] // patch_shape[1])
 
-        # self.position_encoding = tf.keras.layers.Embedding(input_dim=self.num_patches, output_dim=depth)
-        self.position_encoding = positional_encoding(length=self.num_patches, depth=depth)
+        self.position_encoding = tf.keras.layers.Embedding(input_dim=self.num_patches, output_dim=depth)
+        # self.position_encoding = positional_encoding(length=self.num_patches, depth=depth)
+
+        self.extractor = tf.keras.applications.MobileNetV3Small(input_shape=(image_shape[0], image_shape[1], 3),
+                                               include_top=False,
+                                               weights='imagenet')
 
         self.add = tf.keras.layers.Add()
         self.depth = depth
+        self.patch_shape = patch_shape
 
     def call(self, seq):
         length = tf.shape(seq)[1]
-        seq = self.image_embedding(seq) # (batch, seq, depth)
-        seq = tf.keras.layers.Reshape((self.num_patches, seq.shape[-1]))(seq)
+        patch_shape = self.patch_shape
+        # seq = self.image_embedding(seq) # (batch, seq, depth)
+        # seq = tf.image.extract_patches(
+        #                 images =seq,
+        #                 sizes  =[1, patch_shape[0], patch_shape[1], 1],
+        #                 strides=[1, patch_shape[0], patch_shape[1], 1],
+        #                 rates  =[1, 1, 1, 1],
+        #                 padding='VALID' )
+        
+        seq = self.extractor(seq)
+        seq = einops.rearrange(seq, 'b h w c -> b (h w c)')
+        
+        # seq = tf.keras.layers.Reshape((self.num_patches, seq.shape[-1]))(seq)
+        seq = self.projection(seq)
 
-        # x = tf.range(tf.shape(seq)[1])  # (seq)
-        # x = x[tf.newaxis, :]  # (1, seq)
-        # x = self.position_encoding(x)  # (1, seq, depth)
+        x = tf.range(tf.shape(seq)[1])  # (seq)
+        x = x[tf.newaxis, :]  # (1, seq)
+        x = self.position_encoding(x)  # (1, seq, depth)
 
-        seq *= tf.math.sqrt(tf.cast(self.depth, tf.float32))
-        x    = self.position_encoding[tf.newaxis, :length, :]
+        # seq *= tf.math.sqrt(tf.cast(self.depth, tf.float32))
+        # x    = self.position_encoding[tf.newaxis, :length, :]
 
         return self.add([seq, x])
         # return x
@@ -110,11 +120,27 @@ class CausalSelfAttention(tf.keras.layers.Layer):
 
     def call(self, x):
         # query = value = x so this is a form of self attention
-        attn = self.mha(query=x, value=x, key=x,
+        attn = self.mha(query=x, value=x,
                         use_causal_mask=True)
         x = self.add([x, attn])
         return self.layernorm(x)
-    
+
+#for the encoder
+class GlobalSelfAttention(tf.keras.layers.Layer):
+
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.mha = tf.keras.layers.MultiHeadAttention(**kwargs)
+        self.layernorm = tf.keras.layers.LayerNormalization()
+        self.add = tf.keras.layers.Add()
+
+    def call(self, x):
+        attn = self.mha(query=x, value=x,
+                        key=x, use_causal_mask=False)
+            
+        x = self.add([x, attn])
+        return self.layernorm(x)
+
 # looks at both the image and the tokens
 class CrossAttention(tf.keras.layers.Layer):
     def __init__(self,**kwargs):
@@ -125,11 +151,8 @@ class CrossAttention(tf.keras.layers.Layer):
 
     def call(self, x, y, **kwargs):
         # x is the tokens, y is the image
-        attn, attention_scores = self.mha(
-                query=x, value=y,
-                return_attention_scores=True)
-
-        self.last_attention_scores = attention_scores
+        attn = self.mha(
+                value=y, query=x)
 
         x = self.add([x, attn])
         return self.layernorm(x)
@@ -138,15 +161,16 @@ class FeedForward(tf.keras.layers.Layer):
     def __init__(self, units, dropout_rate=0.1):
         super().__init__()
         self.seq = tf.keras.Sequential([
-            tf.keras.layers.Dense(units=2*units, activation='relu'),
+            tf.keras.layers.Dense(units=2*units, activation='gelu'),
             tf.keras.layers.Dense(units=units),
             tf.keras.layers.Dropout(rate=dropout_rate),
         ])
+        self.add = tf.keras.layers.Add()
 
         self.layernorm = tf.keras.layers.LayerNormalization()
 
     def call(self, x):
-        x = x + self.seq(x)
+        x = self.add([x, self.seq(x)]) 
         return self.layernorm(x)
   
 # the decoder block in the original transformer paper
@@ -163,15 +187,13 @@ class DecoderLayer(tf.keras.layers.Layer):
         self.ff = FeedForward(units=units, dropout_rate=dropout_rate)
 
 
-    def call(self, inputs, training=False):
+    def call(self, inputs):
         # in_seq is the image, out_seq is the tokens
         in_seq, out_seq = inputs
 
         out_seq = self.self_attention(out_seq)
 
         out_seq = self.cross_attention(out_seq, in_seq)
-
-        self.last_attention_scores = self.cross_attention.last_attention_scores
 
         out_seq = self.ff(out_seq)
 
@@ -181,14 +203,14 @@ class EncoderLayer(tf.keras.layers.Layer):
     def __init__(self, units, num_heads=1, dropout_rate=0.1):
         super().__init__()
 
-        self.self_attention = CausalSelfAttention(num_heads=num_heads,
+        self.self_attention = GlobalSelfAttention(num_heads=num_heads,
                                                 key_dim=units,
                                                 dropout=dropout_rate)
         
-        self.ff = FeedForward(units=units, dropout_rate=dropout_rate)
+        self.ff = FeedForward(units=units, dropout_rate=0)
 
 
-    def call(self, inputs, training=False):
+    def call(self, inputs):
         # in_seq is the image, out_seq is the tokens
         in_seq = inputs
 
@@ -204,6 +226,7 @@ class TokenOutput(tf.keras.layers.Layer):
 
         self.dense = tf.keras.layers.Dense(
             units=vocab_size, **kwargs)
+        self.add = tf.keras.layers.Add()
         self.banned_tokens = banned_tokens
         self.vocab_size = vocab_size
         self.bias = None

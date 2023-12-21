@@ -84,7 +84,6 @@ class TfDataProcessor():
                 feature[key] = f(value)
 
         # Create a Features message using tf.train.Example.
-
         example_proto = tf.train.Example(features=tf.train.Features(feature=feature))
         return example_proto.SerializeToString()
 
@@ -182,6 +181,7 @@ class TfDataProcessor():
         def prepare(sample):
             img = tf.io.decode_png(sample["img"])
             img = tf.cast(img, tf.float32) # * tf.constant(1/255.) 
+            img = tf.image.grayscale_to_rgb(img) 
             input_tokens = sample["input"]
             label_tokens = sample["label"]
             return (img, input_tokens), label_tokens
@@ -195,9 +195,10 @@ class TfDataProcessor():
                     .map(prepare, tf.data.AUTOTUNE)
                     .map(lambda x, y: ((trainAug(x[0]), x[1]), y), tf.data.AUTOTUNE)
                     .map(lambda x, y: ((tf.math.scalar_mul(1/255., x[0]), x[1]), y), tf.data.AUTOTUNE)
-                    .map(lambda x, y: ((tf.ensure_shape(x[0], self.target_img_shape + [1]), x[1]), y),
+                    .map(lambda x, y: ((tf.ensure_shape(x[0], self.target_img_shape + [3]), x[1]), y),
                                         tf.data.AUTOTUNE)
                     .batch(batch_size))
+                    # .map(lambda x, y: ((tf.math.scalar_mul(1/255., x[0]), x[1]), y), tf.data.AUTOTUNE)
 
             return (ds
                     .unbatch()

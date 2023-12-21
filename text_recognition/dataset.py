@@ -33,16 +33,17 @@ def getFeatureExtractor():
 
 def prepare_dataset(ds, batch_size=32, shuffle_buffer=1000):
 
-    trainAug = tf.keras.Sequential(
-        [
-            tf.keras.layers.RandomBrightness(factor=[-0.5, 0.5]),
-            tf.keras.layers.RandomContrast(factor=0.5)
-        ]
-    )
+    # trainAug = tf.keras.Sequential(
+    #     [
+    #         tf.keras.layers.RandomBrightness(factor=[-0.5, 0.5]),
+    #         tf.keras.layers.RandomContrast(factor=0.5)
+    #     ]
+    # )
     
 
     def prepare(sample):
         img = tf.io.decode_png(sample["img"])
+        img = tf.image.grayscale_to_rgb(img) 
         img = tf.cast(img, tf.float32) # * tf.constant(1/255.) 
         input_tokens = sample["input"]
         label_tokens = sample["label"]
@@ -70,9 +71,9 @@ def prepare_dataset(ds, batch_size=32, shuffle_buffer=1000):
     ds = (ds
             .shuffle(10000)
             .map(prepare, tf.data.AUTOTUNE)
-            .map(lambda x, y: ((trainAug(x[0]), x[1]), y), tf.data.AUTOTUNE)
+            # .map(lambda x, y: ((trainAug(x[0]), x[1]), y), tf.data.AUTOTUNE)
             .map(lambda x, y: ((tf.math.scalar_mul(1/255., x[0]), x[1]), y), tf.data.AUTOTUNE)
-            .map(lambda x, y: ((tf.ensure_shape(x[0], (150, 450, 1)), x[1]), y), tf.data.AUTOTUNE)
+            .map(lambda x, y: ((tf.ensure_shape(x[0], (150, 450, 3)), x[1]), y), tf.data.AUTOTUNE)
             .apply(tf.data.experimental.ignore_errors())
             .batch(batch_size))
 

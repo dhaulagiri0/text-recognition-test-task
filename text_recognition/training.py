@@ -35,7 +35,7 @@ class GenerateText(tf.keras.callbacks.Callback):
     def on_epoch_end(self, epochs=None, logs=None):
         print()
         print()
-        for i in range(10):
+        for i in range(5):
             for t in (0.0, 0.5, 1.0):
                 result = self.model.recognize_text(f"{self.image}/{i}.png", temperature=t)
                 print(result)
@@ -46,6 +46,7 @@ def train_model(ds_path="dataset/spm_records",
                 patch_shape = [25, 25], 
                 image_shape=[150, 450], 
                 batch_size=32, 
+                embedding_path="dataset/embedding_piece.json",
                 weights=None):
     
     vocab_dict = load_json_data(dictionary_path)
@@ -78,7 +79,7 @@ def train_model(ds_path="dataset/spm_records",
         tensorboard_callback,
         model_checkpoint_callback,
         tf.keras.callbacks.EarlyStopping(
-            patience=5, restore_best_weights=True),
+            patience=20, restore_best_weights=True),
         GenerateText(),]
     
     if weights:
@@ -93,22 +94,24 @@ def train_model(ds_path="dataset/spm_records",
         #     pred = recognize_text(model, vocab_dict, f"dataset/short_imgs/train/{i}.png", temperature=0)
         #     print(pred)
     else:
+        embedding_weights, dims = load_embedding_json(embedding_path)
+
         output_layer = TokenOutput(vocab_size, vocab_dict)
         output_layer.adapt(train_ds.map(lambda inputs, labels: labels))
         
-        model = OCRModel(output_layer, 
+        model = OCRModel(False, output_layer, 
                          dictionary=vocab_dict, 
-                         embedding_weights=None, 
+                         embedding_weights=embedding_weights, 
                          image_shape=image_shape, 
                          patch_shape=patch_shape, 
                          vocab_size=vocab_size,
-                         num_heads=8,
+                         num_heads=6,
                          num_layers=12, 
-                         units=512,
+                         units=384,
                          max_length=32, 
-                         dropout_rate=0.1)
+                         dropout_rate=0.3)
 
-        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=5e-5),
         loss=masked_loss,
         metrics=[masked_acc])        
 
@@ -122,9 +125,11 @@ def train_model(ds_path="dataset/spm_records",
         
 if __name__ == '__main__':
 
+
     train_model(ds_path="dataset/spm_records", 
                 dictionary_path="dataset/vocab_piece.json", 
                 patch_shape = [25, 25], 
                 image_shape=[75, 450], 
-                batch_size=8, 
+                batch_size=4,
+                embedding_path="dataset/embedding_piece.json", 
                 weights=None)
