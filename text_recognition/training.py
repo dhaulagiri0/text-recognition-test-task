@@ -58,10 +58,6 @@ def train_model(ds_path="dataset/spm_records",
     valid_ds = TfDataProcessor("valid", record_path=ds_path, target_img_shape=image_shape)
     valid_ds = valid_ds.prepare_dataset(batch_size=batch_size)
     
-    # train_ds = tf.data.TFRecordDataset(train_ds_path).map(_parse_function)
-    # valid_ds = tf.data.TFRecordDataset(valid_ds_path).map(_parse_function)
-    # train_ds = prepare_dataset(train_ds, batch_size)
-    # valid_ds = prepare_dataset(valid_ds, batch_size)
 
     checkpoint_filepath = 'dataset/checkpoints/' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
@@ -90,9 +86,7 @@ def train_model(ds_path="dataset/spm_records",
         })
 
         model.evaluate(valid_ds, batch_size = 32, steps = 20, verbose=2)
-        # for i in range(0, 20):
-        #     pred = recognize_text(model, vocab_dict, f"dataset/short_imgs/train/{i}.png", temperature=0)
-        #     print(pred)
+
     else:
         embedding_weights, dims = load_embedding_json(embedding_path)
 

@@ -4,9 +4,10 @@ from custom_layers import DecoderLayer, SeqEmbedding, ImageEmbedding, EncoderLay
 from dataset import detokenise
 from tf_data_process import TfDataProcessor
 from PIL import Image
+from pytesseract import Output
+import easyocr, pytesseract
 import cv2
 import numpy as np
-import easyocr
 
 
 class OCRModel(tf.keras.Model):
@@ -32,6 +33,8 @@ class OCRModel(tf.keras.Model):
             # sets up an ocr model using the easyocr lib
             # using cpu here since the GPU option somehow gets stuck on my machine
             self.reader = easyocr.Reader(['ch_sim','en'], gpu=False)
+            self.reader_chi = easyocr.Reader(['ch_sim'], gpu=False)
+            self.reader_en = easyocr.Reader(['en'], gpu=False)
             print("model loaded")
             
         else: # self made model
@@ -108,11 +111,39 @@ class OCRModel(tf.keras.Model):
         
         return tokens
     
-        
+    # recognise text with separate ocr models for chinese and english
+    def multiShot(self, image: Path):
+        reader_en = self.reader_en
+        reader_chi = self.reader_chi
+        reader = self.reader
 
+        image = cv2.imread(image.absolute().as_posix())
+        ps, bbs = OCRModel.getSubImages(image)
+
+        result = []
+        for p, bb in zip(ps, bbs):
+            en = reader_en.readtext(np.asarray(p))
+            chi = reader_chi.readtext(np.asarray(p))
+            # r = reader.readtext(np.asarray(p))
+
+            # offset bbox of each word
+            if (chi == [] and en != []) or (en !=[] and en[0][-1] > chi[0][-1]):
+                result += [(bb, en[0][1], en[0][2])]
+
+            if (en == [] and chi != []) or (chi != [] and en[0][-1] < chi[0][-1]):
+                result += [(bb, chi[0][1], chi[0][2])]
+            # result += [(bb, r[0][1], r[0][2])]
+
+        return result
+        
+        
+    # recognise text with easy ocr model, one shot
     def recognize_text(self, image: Path):
 
         result = self.reader.readtext(image.absolute().as_posix())
+        # result = self.multiShot(image)
+
+        if len(result) == 0: return ""
 
         last_y = 0
         last_x = 0
@@ -121,6 +152,7 @@ class OCRModel(tf.keras.Model):
 
         # find average height and width of letters
         for r in result:
+            print(r)
             bbox = r[0]
 
             x = bbox[0][0]
@@ -161,7 +193,17 @@ class OCRModel(tf.keras.Model):
             
             last_y = y
             last_x = x
+        # overall = ""
+        # prevLine = 0
+        # for r in result: 
+        #     if r[0][0] != prevLine:
+        #         prevLine = r[0][0]
+        #         overall += "\n"
+        #     if r[0][1] != 0:
+        #         overall += " "
+        #     overall += r[1]
 
+        print(overall)
         return overall
 
     def recognize_text_(self, image: Path, temperature=1, get_patches=False) -> str:
@@ -207,49 +249,69 @@ class OCRModel(tf.keras.Model):
 
         return txt_seq
     
-    # uses some cv2 contouring techniques to get rows of text in a image from the bottom up
-    def getSubImages(img, padding=0.0):
+    # # uses some cv2 contouring techniques to get rows of text in a image from the bottom up
+    # def getSubImages(img, padding=0.05):
 
-        (H, W) = img.shape[:2]
-        (padding_h, padding_w) = (int(H * padding), int(W * padding))
-        # convert to grayscale
-        # adjusted = cv2.convertScaleAbs(img.numpy(), alpha=1.5)
-        gray = cv2.cvtColor(img.numpy(), cv2.COLOR_BGR2GRAY)
+    #     (H, W) = img.shape[:2]
+    #     (padding_h, padding_w) = (int(H * padding), int(W * 0))
+    #     # convert to grayscale
+    #     # adjusted = cv2.convertScaleAbs(img.numpy(), alpha=1.5)
+    #     gray = cv2.cvtColor(img.numpy(), cv2.COLOR_BGR2GRAY)
 
-        # threshold
-        thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)[1]
-        avg_color_per_row = np.average(thresh, axis=0)
-        avg_color = np.average(avg_color_per_row, axis=0)
+    #     # threshold
+    #     thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)[1]
+    #     avg_color_per_row = np.average(thresh, axis=0)
+    #     avg_color = np.average(avg_color_per_row, axis=0)
 
-        if avg_color > 255 / 2:
-            # invert
-            thresh = 255 - thresh
+    #     if avg_color > 255 / 2:
+    #         # invert
+    #         thresh = 255 - thresh
 
-        # apply horizontal morphology close
-        kernel = np.ones((5 , 100), np.uint8)
-        morph = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
+    #     # apply horizontal morphology close
+    #     kernel = np.ones((3 , 20), np.uint8)
+    #     morph = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
 
-        # get external contours
-        contours = cv2.findContours(morph, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-        contours = contours[0] if len(contours) == 2 else contours[1]
+    #     # get external contours
+    #     contours = cv2.findContours(morph, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    #     contours = contours[0] if len(contours) == 2 else contours[1]
 
-        # extract tensor patches
-        patches = []
-        # convert to bounding box coordinates and sort by row
-        bboxes = list(map(cv2.boundingRect, contours))
-        for bbox in bboxes:
-            x,y,w,h = bbox
-            hs = max(0, y-padding_h)
-            he = min(y+h+padding_h, H)
+    #     # extract tensor patches
+    #     patches = []
+    #     # convert to bounding box coordinates and sort by row
+    #     bboxes = list(map(cv2.boundingRect, contours))
+    #     for bbox in bboxes:
+    #         x,y,w,h = bbox
+    #         hs = max(0, y-padding_h)
+    #         he = min(y+h+padding_h, H)
 
-            ws = max(0, x-padding_w)
-            we = min(x+w+padding_w, W)
+    #         ws = max(0, x-padding_w)
+    #         we = min(x+w+padding_w, W)
 
-            patch= img[hs:he, ws:we, :]
-            patches.append(patch)
+    #         patch= img[hs:he, ws:we, :]
+    #         patches.append(patch)
         
-        return patches
+    #     return patches
 
+    # uses pytesseract to get image bboxes for individual words
+    def getSubImages(img: np.array):
+
+        d = pytesseract.image_to_data(img, output_type=Output.DICT)
+        n_boxes = len(d['level'])
+        ps = []
+        positions = []
+        for i in range(n_boxes):
+            (x, y, w, h) = (d['left'][i], d['top'][i], d['width'][i], d['height'][i])
+            level = d['level'][i]
+            line = d['line_num'][i]
+            word_num = d['word_num'][i]
+            patch = np.pad(img[y:y+h, x:x+w, :], ((5, 5), (12, 12), (0, 0)),'edge')
+
+            # get word level
+            if level == 5:
+                ps.append(patch)
+                positions.append((line, word_num))
+
+        return ps, positions
 
 
     
