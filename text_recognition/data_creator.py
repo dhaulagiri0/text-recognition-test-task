@@ -17,6 +17,7 @@ import translators as ts
 import json, os
 import random
 import tqdm
+import sentencepiece as spm
 
 """
 A class to generate usable datasets from Maven
@@ -55,7 +56,9 @@ class JsonDataCreator():
                  font_size=50,
                  font_dir="dataset/fonts",
                  short_data_path=None,
-                 clean_path=None):
+                 clean_path=None,
+                 use_spm=True,
+                 model_file="dataset/engchi.model"):
         
         self.maven_path=maven_path
         self.dataset_name=dataset_name
@@ -79,7 +82,11 @@ class JsonDataCreator():
             if vocab_path and os.path.isfile(vocab_path):
                 self.word_2_token = JsonDataCreator._load_json_data(vocab_path)
             else:
-                self.word_2_token = self.create_vocab()
+                if use_spm:
+                    sp = spm.SentencePieceProcessor(model_file=str(model_file))
+                    self.word_2_token ={sp.id_to_piece(id):id for id in range(sp.get_piece_size())}
+                else:
+                    self.word_2_token = self.create_vocab()
 
             self.vocab_size = len(self.word_2_token)
 
