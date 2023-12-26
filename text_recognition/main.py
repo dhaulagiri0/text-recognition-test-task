@@ -2,7 +2,6 @@ from pathlib import Path
 
 from ocr_model import OCRModel
 from evaluation import evaluate_model
-import os, easyocr
 
 DATA_PATH = "dataset/"
 

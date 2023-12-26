@@ -2,11 +2,8 @@ import tensorflow as tf
 from ocr_model import OCRModel
 from embedding_utils import load_json_data, load_embedding_json
 from custom_layers import TokenOutput
-from dataset import prepare_dataset, _parse_function
 import datetime
-from PIL import Image
-from tf_data_process import add_padding, TfDataProcessor
-from dataset import detokenise
+from tf_data_process import TfDataProcessor
 
 # losses and acc matrices defined by tensorflow for transformer models
 def masked_loss(labels, preds):  
@@ -37,7 +34,7 @@ class GenerateText(tf.keras.callbacks.Callback):
         print()
         for i in range(5):
             for t in (0.0, 0.5, 1.0):
-                result = self.model.recognize_text(f"{self.image}/{i}.png", temperature=t)
+                result = self.model.recognize_text_(f"{self.image}/{i}.png", temperature=t)
                 print(result)
             print()
 

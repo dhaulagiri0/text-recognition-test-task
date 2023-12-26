@@ -14,6 +14,7 @@ class OCRModel(tf.keras.Model):
     
     def __init__(self, 
                  use_reader=True,
+                 mixed = False,
                  output_layer=None,
                  dictionary=None, 
                  embedding_weights=None,
@@ -32,10 +33,14 @@ class OCRModel(tf.keras.Model):
             print("using reader")
             # sets up an ocr model using the easyocr lib
             # using cpu here since the GPU option somehow gets stuck on my machine
-            self.reader = easyocr.Reader(['ch_sim','en'], gpu=False)
-            self.reader_chi = easyocr.Reader(['ch_sim'], gpu=False)
-            self.reader_en = easyocr.Reader(['en'], gpu=False)
+            if mixed:
+                self.reader_en  = easyocr.Reader(['en'], gpu=False)
+                self.reader_chi = easyocr.Reader(['ch_sim'], gpu=False)
+            else:
+                self.reader     = easyocr.Reader(['ch_sim','en'], gpu=False)
             print("model loaded")
+
+            self.mixed = mixed
             
         else: # self made model
             self.max_length = max_length
@@ -69,14 +74,14 @@ class OCRModel(tf.keras.Model):
 
         return tokens
     
-    # expects image to be a path
+    # expects image to be a path string
     @staticmethod
-    def img_preprocess(image, image_shape):
+    def img_preprocess(image: str, image_shape):
 
         # padding
         timg = TfDataProcessor.add_padding(image, target_shape=image_shape)
         # grayscale
-        # timg = tf.image.rgb_to_grayscale(timg)
+        timg = tf.image.rgb_to_grayscale(timg)
         # norm
         timg = tf.math.scalar_mul(1/255., timg)
         
@@ -115,7 +120,6 @@ class OCRModel(tf.keras.Model):
     def multiShot(self, image: Path):
         reader_en = self.reader_en
         reader_chi = self.reader_chi
-        reader = self.reader
 
         image = cv2.imread(image.absolute().as_posix())
         ps, bbs = OCRModel.getSubImages(image)
@@ -124,7 +128,6 @@ class OCRModel(tf.keras.Model):
         for p, bb in zip(ps, bbs):
             en = reader_en.readtext(np.asarray(p))
             chi = reader_chi.readtext(np.asarray(p))
-            # r = reader.readtext(np.asarray(p))
 
             # offset bbox of each word
             if (chi == [] and en != []) or (en !=[] and en[0][-1] > chi[0][-1]):
@@ -132,7 +135,6 @@ class OCRModel(tf.keras.Model):
 
             if (en == [] and chi != []) or (chi != [] and en[0][-1] < chi[0][-1]):
                 result += [(bb, chi[0][1], chi[0][2])]
-            # result += [(bb, r[0][1], r[0][2])]
 
         return result
         
@@ -140,68 +142,71 @@ class OCRModel(tf.keras.Model):
     # recognise text with easy ocr model, one shot
     def recognize_text(self, image: Path):
 
-        result = self.reader.readtext(image.absolute().as_posix())
-        # result = self.multiShot(image)
-
-        if len(result) == 0: return ""
-
-        last_y = 0
-        last_x = 0
-        avg_w = 0
-        avg_h = 0
-
-        # find average height and width of letters
-        for r in result:
-            print(r)
-            bbox = r[0]
-
-            x = bbox[0][0]
-            y = bbox[0][1]
-            w = bbox[1][0] - x
-            h = bbox[2][1] - y
-
-            avg_w += w // len(r[1])
-            avg_h += h
-
-        avg_h = avg_h // len(result)
-        avg_w = avg_w // len(result)
+        if not self.mixed:
+            result = self.reader.readtext(image.absolute().as_posix())
+        else:
+            result = self.multiShot(image)
 
         overall = ""
+        
+        if len(result) == 0: return overall
 
-        # construct the overall text
-        # adds spaces and new lines depending on the location of the bboxes
-        for i, r in enumerate(result):
-            bbox = r[0]
-            word = r[1]
+        if not self.mixed:
+            last_y = 0
+            last_x = 0
+            avg_w = 0
+            avg_h = 0
 
-            x = bbox[0][0]
-            y = bbox[0][1]
-            w = bbox[1][0] - x
-            h = bbox[2][1] - y
+            # find average height and width of letters
+            for r in result:
+                print(r)
+                bbox = r[0]
 
-            # if the current bit of text is significantly
-            # lower than the previous, add new line
-            if i != 0 and y - last_y >= avg_h * 0.6:
-                overall += "\n"
+                x = bbox[0][0]
+                y = bbox[0][1]
+                w = bbox[1][0] - x
+                h = bbox[2][1] - y
 
-            # if the current bit of text is significantly
-            # spaced out from the last bit, add space
-            if i != 0 and x - last_x >= avg_w * 0.6:
-                overall += " "
+                avg_w += w // len(r[1])
+                avg_h += h
 
-            overall += f"{word}"
-            
-            last_y = y
-            last_x = x
-        # overall = ""
-        # prevLine = 0
-        # for r in result: 
-        #     if r[0][0] != prevLine:
-        #         prevLine = r[0][0]
-        #         overall += "\n"
-        #     if r[0][1] != 0:
-        #         overall += " "
-        #     overall += r[1]
+            avg_h = avg_h // len(result)
+            avg_w = avg_w // len(result)
+
+            # construct the overall text
+            # adds spaces and new lines depending on the location of the bboxes
+            for i, r in enumerate(result):
+                bbox = r[0]
+                word = r[1]
+
+                x = bbox[0][0]
+                y = bbox[0][1]
+                w = bbox[1][0] - x
+                h = bbox[2][1] - y
+
+                # if the current bit of text is significantly
+                # lower than the previous, add new line
+                if i != 0 and y - last_y >= avg_h * 0.6:
+                    overall += "\n"
+
+                # if the current bit of text is significantly
+                # spaced out from the last bit, add space
+                if i != 0 and x - last_x >= avg_w * 0.6:
+                    overall += " "
+
+                overall += f"{word}"
+                
+                last_y = y
+                last_x = x
+        else:
+            prevLine = 0
+            for r in result: 
+                if r[0][0] != prevLine:
+                    prevLine = r[0][0]
+                    overall += "\n"
+                if r[0][1] != 0:
+                    overall += " "
+                overall += r[1]
 
         print(overall)
         return overall
@@ -216,7 +221,7 @@ class OCRModel(tf.keras.Model):
         img = Image.open(image).convert('RGB')
         # divide a large image into text blobs if necessary
         if get_patches:
-            image_list = OCRModel.getSubImages(img)
+            image_list = OCRModel.getSubImages_(img)
         else:
             image_list = [img]
         
@@ -249,49 +254,6 @@ class OCRModel(tf.keras.Model):
 
         return txt_seq
     
-    # # uses some cv2 contouring techniques to get rows of text in a image from the bottom up
-    # def getSubImages(img, padding=0.05):
-
-    #     (H, W) = img.shape[:2]
-    #     (padding_h, padding_w) = (int(H * padding), int(W * 0))
-    #     # convert to grayscale
-    #     # adjusted = cv2.convertScaleAbs(img.numpy(), alpha=1.5)
-    #     gray = cv2.cvtColor(img.numpy(), cv2.COLOR_BGR2GRAY)
-
-    #     # threshold
-    #     thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)[1]
-    #     avg_color_per_row = np.average(thresh, axis=0)
-    #     avg_color = np.average(avg_color_per_row, axis=0)
-
-    #     if avg_color > 255 / 2:
-    #         # invert
-    #         thresh = 255 - thresh
-
-    #     # apply horizontal morphology close
-    #     kernel = np.ones((3 , 20), np.uint8)
-    #     morph = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
-
-    #     # get external contours
-    #     contours = cv2.findContours(morph, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    #     contours = contours[0] if len(contours) == 2 else contours[1]
-
-    #     # extract tensor patches
-    #     patches = []
-    #     # convert to bounding box coordinates and sort by row
-    #     bboxes = list(map(cv2.boundingRect, contours))
-    #     for bbox in bboxes:
-    #         x,y,w,h = bbox
-    #         hs = max(0, y-padding_h)
-    #         he = min(y+h+padding_h, H)
-
-    #         ws = max(0, x-padding_w)
-    #         we = min(x+w+padding_w, W)
-
-    #         patch= img[hs:he, ws:we, :]
-    #         patches.append(patch)
-        
-    #     return patches
-
     # uses pytesseract to get image bboxes for individual words
     def getSubImages(img: np.array):
 

@@ -30,28 +30,6 @@ def create_embed_index(path):
     print(f'Found {len(embeddings_index)} word vectors. Of length {dim}')
     return embeddings_index, dim
 
-# # the word_index in this case should be a dictionary of of BPEmb.encode subwords
-# def create_maxtric(word_index, embeddings_index, embedding_dim = 300):
-#     # plus 2 for start and end
-#     num_tokens = len(word_index) + 2
-#     hits = 0
-#     misses = 0
-
-#     # Prepare embedding matrix
-#     embedding_matrix = np.zeros((num_tokens, embedding_dim))
-#     for word, i in word_index.items():
-#         embedding_vector = embeddings_index.get(word)
-#         if embedding_vector is not None:
-#             # Words not found in embedding index will be all-zeros.
-#             embedding_matrix[i] = embedding_vector
-#             hits += 1
-#         else:
-#             misses += 1
-#     print("Converted %d words (%d misses)" % (hits, misses))
-#     return embedding_matrix
-
-# TODO create a function to convert sentences to BPEmbed indexes and use these to create the embedding weights
-
 def get_embedding_pair(sentence, multibpemb):
     # split a sentence into subwords and gives the ids of each subword
     subwords_ids = multibpemb.encode_ids(sentence)
@@ -172,19 +150,3 @@ def load_embedding_json(path):
         embedding = json.load(f, cls=Decoder, object_hook=keystoint)
 
     return embedding, len(embedding[0])
-
-# embeddings_index, dim = create_embed_index(os.path.join(dirname, TXT_REL))
-
-# multibpemb = BPEmb(lang="multi", vs=1000000, dim=300)
-# text = 'John F. Kennedy said "Ich bin ein Pfannkuchen". 这是一个中文句子.日本語の文章です。'
-# embedding = multibpemb.embed(text)
-# print(embedding, embedding.shape)
-
-# text = '这是一个中文句子'
-# embedding = multibpemb.embed(text)
-# print(embedding, embedding.shape)
-
-# text = '这是一个中文句子 test testtest'
-# embedding = multibpemb.embed(text)
-# subwords = multibpemb.encode_ids(text)
-# print(embedding, subwords, embedding.shape)

@@ -18,27 +18,27 @@ to prepare tfrecord for training, run prepare_dataset
 class TfDataProcessor():
 
     def __init__(self,
-                 dataset_name        = "train",
-                 short_data_path     = "dataset/short_json",
-                 dict_path           = "dataset/vocab_piece.json",
-                 output_path         = "dataset/records_short",
-                 max_sequence_length = 32,
-                 target_img_shape    = [150, 450],
-                 record_path         = None,
-                 spm_model_path      = "dataset/engchi.model"):
+                 dataset_name="train",
+                 short_data_path="dataset/short_json",
+                 dict_path="dataset/vocab_piece.json",
+                 output_path="dataset/records_short",
+                 max_sequence_length=32,
+                 target_img_shape=[150, 450],
+                 record_path=None,
+                 spm_model_path="dataset/engchi.model"):
         
-        self.dataset_name        = dataset_name
-        self.target_img_shape    = target_img_shape
-        self.max_sequence_length = max_sequence_length
-        self.spm_model           = spm.SentencePieceProcessor(model_file=spm_model_path)
+        self.dataset_name=dataset_name
+        self.target_img_shape=target_img_shape
+        self.max_sequence_length=max_sequence_length
+        self.spm_model=spm.SentencePieceProcessor(model_file=spm_model_path)
 
         if record_path:
-            self.record_path     = f"{record_path}/{dataset_name}.tfrecord"
+            self.record_path=f"{record_path}/{dataset_name}.tfrecord"
         else:
-            self.record_path     = None
-            self.output_path     = output_path
-            self.short_data      = self._load_json_data(f"{short_data_path}/{dataset_name}.json")
-            self.word_2_token    = self._load_json_data(dict_path)
+            self.record_path=None
+            self.output_path=output_path
+            self.short_data=self._load_json_data(f"{short_data_path}/{dataset_name}.json")
+            self.word_2_token=self._load_json_data(dict_path)
 
         self.feature_description = {
             'img': tf.io.FixedLenFeature([], tf.string),

@@ -17,9 +17,6 @@ import translators as ts
 import json, os
 import random
 import tqdm
-import re
-import cv2
-import numpy as np
 
 """
 A class to generate usable datasets from Maven
@@ -50,21 +47,21 @@ for model training (using tf_data_process.py)
 class JsonDataCreator():
 
     def __init__(self,
-                 maven_path      = "dataset/",
-                 dataset_name    = "train",
-                 translate_rate  = .5,
-                 vocab_path      = "dataset/vocab.json",
-                 img_path        = "dataset/short_imgs",
-                 font_size       = 50,
-                 font_dir        = "dataset/fonts",
-                 short_data_path = None,
-                 clean_path      = None):
+                 maven_path="dataset/",
+                 dataset_name="train",
+                 translate_rate=.5,
+                 vocab_path= "dataset/vocab.json",
+                 img_path="dataset/short_imgs",
+                 font_size=50,
+                 font_dir="dataset/fonts",
+                 short_data_path=None,
+                 clean_path=None):
         
-        self.maven_path   = maven_path
-        self.dataset_name = dataset_name
-        self.img_path     = img_path
-        self.font_size    = font_size
-        self.font_dir     = font_dir
+        self.maven_path=maven_path
+        self.dataset_name=dataset_name
+        self.img_path=img_path
+        self.font_size=font_size
+        self.font_dir=font_dir
 
         # this determine how much of an English sentence is translated
         self.translate_rate = translate_rate

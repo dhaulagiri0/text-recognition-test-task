@@ -33,12 +33,13 @@ def getFeatureExtractor():
 
 def prepare_dataset(ds, batch_size=32, shuffle_buffer=1000):
 
-    # trainAug = tf.keras.Sequential(
-    #     [
-    #         tf.keras.layers.RandomBrightness(factor=[-0.5, 0.5]),
-    #         tf.keras.layers.RandomContrast(factor=0.5)
-    #     ]
-    # )
+    # some simple augments
+    trainAug = tf.keras.Sequential(
+        [
+            tf.keras.layers.RandomBrightness(factor=[-0.5, 0.5]),
+            tf.keras.layers.RandomContrast(factor=0.5)
+        ]
+    )
     
 
     def prepare(sample):
@@ -71,7 +72,7 @@ def prepare_dataset(ds, batch_size=32, shuffle_buffer=1000):
     ds = (ds
             .shuffle(10000)
             .map(prepare, tf.data.AUTOTUNE)
-            # .map(lambda x, y: ((trainAug(x[0]), x[1]), y), tf.data.AUTOTUNE)
+            .map(lambda x, y: ((trainAug(x[0]), x[1]), y), tf.data.AUTOTUNE)
             .map(lambda x, y: ((tf.math.scalar_mul(1/255., x[0]), x[1]), y), tf.data.AUTOTUNE)
             .map(lambda x, y: ((tf.ensure_shape(x[0], (150, 450, 3)), x[1]), y), tf.data.AUTOTUNE)
             .apply(tf.data.experimental.ignore_errors())
