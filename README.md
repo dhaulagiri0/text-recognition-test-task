@@ -1,4 +1,4 @@
-# OCR Task
+in# OCR Task
 
 ## Overview
 Although I managed to implement a transformer OCR model in tensorflow, I was
@@ -15,6 +15,10 @@ detect Chinese and English sentences in an Image. This model uses a [DBNet](http
 segmentation on the image to identify the location of text blobs within a image before
 applying separate OCR models to detect text in different languages. This divided and
 conquer approach might be the way to go for multilingual OCR.
+
+I have also tried using Google's tesseract library through [PyTesseract](https://pypi.org/project/pytesseract/), isolating text blobs from input images and applying 
+separate OCR models (Chinese and English) from both Tesseract and easyOCR for each text blob for detection, but the performance was poorer than 
+using the single multilingual model from easyOCR.
 
 ## Process
 ### Data Creation
