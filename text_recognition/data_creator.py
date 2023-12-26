@@ -58,7 +58,7 @@ class JsonDataCreator():
                  short_data_path=None,
                  clean_path=None,
                  use_spm=True,
-                 model_file="dataset/engchi.model"):
+                 spm_model_path="dataset/engchi.model"):
         
         self.maven_path=maven_path
         self.dataset_name=dataset_name
@@ -83,7 +83,7 @@ class JsonDataCreator():
                 self.word_2_token = JsonDataCreator._load_json_data(vocab_path)
             else:
                 if use_spm:
-                    sp = spm.SentencePieceProcessor(model_file=str(model_file))
+                    sp = spm.SentencePieceProcessor(model_file=str(spm_model_path))
                     self.word_2_token ={sp.id_to_piece(id):id for id in range(sp.get_piece_size())}
                 else:
                     self.word_2_token = self.create_vocab()
